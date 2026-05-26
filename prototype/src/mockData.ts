@@ -1,6 +1,31 @@
 import type { ChatMessage, DJMessage, Profile, Track } from "./types"
 import { wordsFromText } from "./types"
 
+export type Mood = {
+  id: string
+  label: string
+  emoji: string
+  tagline: string
+  accent: string
+}
+
+export const mockMoods: Mood[] = [
+  { id: "tonight", label: "今晚", emoji: "🌙", tagline: "慢一点，让肩膀松", accent: "#b76cff" },
+  { id: "coding", label: "写代码", emoji: "⌨", tagline: "后摇 + 环境，不要人声", accent: "#29ffb8" },
+  { id: "walking", label: "散步", emoji: "🚶", tagline: "90s 华语 + city pop", accent: "#ff9b6b" },
+  { id: "sleep", label: "入睡", emoji: "🌃", tagline: "钢琴 + 雨", accent: "#6d4cff" },
+]
+
+export const mockChips = [
+  "再来一首",
+  "换个心情",
+  "慢一点",
+  "猛一点",
+  "存进今晚",
+  "我现在在写代码",
+  "讲讲这首歌",
+]
+
 export const mockTracks: Track[] = [
   {
     id: "t-plastic-love",
@@ -85,6 +110,12 @@ export const mockMessages: ChatMessage[] = [
     "好。从涩谷拐回 1994 的香港，王菲的《如风》。同样是城市夜的句号。",
     [mockTracks[2]],
   ),
+]
+
+export const mockUpcoming: { track: Track; caption: string }[] = [
+  { track: mockTracks[2], caption: "拐回 1994 香港，给你一个干净的落点" },
+  { track: mockTracks[1], caption: "降下温度，让心跳慢下来" },
+  { track: mockTracks[3], caption: "收尾，留一点夏夜的余温" },
 ]
 
 export const mockProfiles: Profile[] = [

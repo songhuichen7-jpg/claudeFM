@@ -10,7 +10,17 @@ import {
 } from "react"
 import type { ChatMessage, DJMessage, Profile, Theme, Track } from "./types"
 import { wordsFromText } from "./types"
-import { mockHealth, mockMessages, mockProfiles, mockTasteFiles, mockTracks, type HealthSnapshot } from "./mockData"
+import {
+  mockHealth,
+  mockMessages,
+  mockMoods,
+  mockProfiles,
+  mockTasteFiles,
+  mockTracks,
+  mockUpcoming,
+  type HealthSnapshot,
+  type Mood,
+} from "./mockData"
 
 export type AnalyserHandle = {
   freq: Uint8Array | null
@@ -43,6 +53,12 @@ type State = {
 
   profiles: Profile[]
   tasteFiles: { name: string; body: string }[]
+
+  moods: Mood[]
+  currentMood: Mood
+  setMood: (id: string) => void
+
+  upcoming: { track: Track; caption: string }[]
 
   toggleTheme: () => void
   toggleHideChat: () => void
@@ -88,6 +104,12 @@ export function PrototypeProvider({ children }: { children: ReactNode }) {
 
   const [profiles] = useState<Profile[]>(mockProfiles)
   const [tasteFiles, setTasteFiles] = useState(mockTasteFiles)
+  const [moods] = useState<Mood[]>(mockMoods)
+  const [currentMoodId, setCurrentMoodId] = useState<string>(() => {
+    if (typeof window === "undefined") return mockMoods[0].id
+    return window.localStorage.getItem("claudio-prototype-mood") ?? mockMoods[0].id
+  })
+  const [upcoming] = useState(mockUpcoming)
 
   const queueIndexRef = useRef(0)
   const analyserRef = useRef<AnalyserHandle>({ freq: null, level: 0, isAudio: false, channel: null })
@@ -250,6 +272,33 @@ export function PrototypeProvider({ children }: { children: ReactNode }) {
     // Prototype: no-op; the active profile chip is purely visual.
   }, [])
 
+  const setMood = useCallback((id: string) => {
+    setCurrentMoodId(id)
+    if (typeof window !== "undefined") window.localStorage.setItem("claudio-prototype-mood", id)
+    const m = mockMoods.find(x => x.id === id)
+    if (!m) return
+    const ts = new Date()
+    const hhmm = `${String(ts.getHours()).padStart(2, "0")}:${String(ts.getMinutes()).padStart(2, "0")}`
+    const text = `切到「${m.label}」。${m.tagline}。`
+    const words = wordsFromText(text)
+    const djId = `dj-mood-${ts.getTime()}`
+    setMessages(prev => [
+      ...prev,
+      {
+        id: djId,
+        kind: "dj",
+        speaker: "Claudio",
+        timestamp: hhmm,
+        text,
+        words,
+        duration: words.reduce((a, w) => Math.max(a, w.end), 0) || 2500,
+        hasReplay: true,
+      },
+    ])
+    setActiveDJId(djId)
+    setDjElapsedMs(0)
+  }, [])
+
   const saveTasteFile = useCallback((name: string, body: string) => {
     setTasteFiles(prev => prev.map(f => (f.name === name ? { ...f, body } : f)))
   }, [])
@@ -271,6 +320,10 @@ export function PrototypeProvider({ children }: { children: ReactNode }) {
     analyserRef,
     profiles,
     tasteFiles,
+    moods,
+    currentMood: moods.find(m => m.id === currentMoodId) ?? moods[0],
+    setMood,
+    upcoming,
     toggleTheme,
     toggleHideChat,
     togglePlay,
@@ -288,7 +341,7 @@ export function PrototypeProvider({ children }: { children: ReactNode }) {
   }), [
     currentTrack, isPlaying, currentTime, duration, volume, liked,
     theme, hideChat, messages, activeDJId, djElapsedMs,
-    profiles, tasteFiles,
+    profiles, tasteFiles, moods, currentMoodId, upcoming, setMood,
     toggleTheme, toggleHideChat, togglePlay, next, prev, stop, toggleLike,
     setVolume, seek, selectTrack, sendMessage, replayDJ, switchProfile, saveTasteFile,
   ])
