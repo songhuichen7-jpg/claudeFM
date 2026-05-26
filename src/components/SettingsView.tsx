@@ -3,6 +3,7 @@ import { ChevronDown, RefreshCw, Save, Wifi, WifiOff, Plus, Check, Trash2, Spark
 import { clsx } from "clsx"
 import { usePlayer } from "../state/PlayerContext"
 import { api, type TasteProposal } from "../api/client"
+import { NcmLoginPanel } from "./LoginCard"
 
 type Props = { open: boolean; onClose: () => void }
 
@@ -342,135 +343,8 @@ function Row({ label, value, ok }: { label: string; value: string; ok?: boolean 
 // per-profile delete UI.
 void Trash2
 
-// ---- NCM login panel ------------------------------------------------------
-
-function NcmLoginPanel() {
-  const [status, setStatus] = useState<Awaited<ReturnType<typeof api.ncmStatus>> | null>(null)
-  const [qr, setQr] = useState<{ key: string; qrimg: string } | null>(null)
-  const [phase, setPhase] = useState<"idle" | "scanning" | "scanned" | "success" | "expired" | "error">("idle")
-  const [errMsg, setErrMsg] = useState<string | null>(null)
-
-  const refresh = async () => {
-    try { setStatus(await api.ncmStatus()) } catch {}
-  }
-
-  useEffect(() => { refresh() }, [])
-
-  // Poll QR check while scanning
-  useEffect(() => {
-    if (phase !== "scanning" && phase !== "scanned") return
-    if (!qr) return
-    let cancelled = false
-    const tick = async () => {
-      try {
-        const r = await api.ncmQrCheck(qr.key)
-        if (cancelled) return
-        if (r.status === "success") {
-          setPhase("success")
-          setQr(null)
-          await refresh()
-          return
-        }
-        if (r.status === "scanned") setPhase("scanned")
-        if (r.status === "expired") { setPhase("expired"); setQr(null); return }
-        if (r.status === "error") { setPhase("error"); setErrMsg(r.message ?? "未知错误"); return }
-        setTimeout(tick, 1500)
-      } catch (err) {
-        if (cancelled) return
-        setPhase("error")
-        setErrMsg((err as Error).message)
-      }
-    }
-    tick()
-    return () => { cancelled = true }
-  }, [phase, qr])
-
-  const startLogin = async () => {
-    setErrMsg(null)
-    setPhase("idle")
-    try {
-      const r = await api.ncmQrCreate()
-      setQr(r)
-      setPhase("scanning")
-    } catch (err) {
-      setPhase("error")
-      setErrMsg((err as Error).message)
-    }
-  }
-
-  const logout = async () => {
-    await api.ncmLogout()
-    setQr(null)
-    setPhase("idle")
-    await refresh()
-  }
-
-  return (
-    <section className="mb-5 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-pixel text-[12px] tracking-[0.22em] text-white/55">网易云账号</h3>
-        {status?.loggedIn ? (
-          <button
-            type="button"
-            onClick={logout}
-            className="rounded-full border border-white/10 px-3 py-1 font-pixel text-[10px] tracking-[0.18em] text-white/70 hover:bg-white/8"
-          >
-            退出
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={startLogin}
-            className="rounded-full border border-white/10 px-3 py-1 font-pixel text-[10px] tracking-[0.18em] text-white/85 hover:bg-white/8"
-          >
-            扫码登录
-          </button>
-        )}
-      </div>
-
-      {status?.loggedIn ? (
-        <div className="mt-3 flex items-center gap-3 rounded-lg bg-black/30 p-3">
-          <span className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-rose-500/40 to-orange-400/30 font-pixel text-[12px] text-white">
-            {(status.nickname ?? "?").slice(0, 1).toUpperCase()}
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="truncate font-pixel text-[13px] tracking-[0.04em] text-white">
-              {status.nickname ?? "（已登录）"}
-            </div>
-            <div className="font-mono text-[10px] text-white/40">
-              uid {status.userId} · {status.vip ? `VIP（type ${status.vipType}）— 完整音频可解锁` : "无 VIP — 仅试听 30s"}
-            </div>
-          </div>
-        </div>
-      ) : qr ? (
-        <div className="mt-3 flex flex-col items-center gap-2 rounded-lg bg-black/30 p-4">
-          <img src={qr.qrimg} alt="NCM 登录二维码" className="h-44 w-44 rounded-md bg-white p-2" />
-          <div className="font-pixel text-[11px] tracking-[0.18em] text-white/70">
-            {phase === "scanning" && "等待扫码…"}
-            {phase === "scanned" && "已扫码，请在手机上确认"}
-            {phase === "expired" && (
-              <button onClick={startLogin} className="text-[#29ffb8] hover:underline">二维码过期，点击重试</button>
-            )}
-            {phase === "error" && <span className="text-rose-400">错误：{errMsg}</span>}
-          </div>
-          <div className="text-center font-mono text-[10px] leading-snug text-white/35">
-            打开网易云音乐 App → 「我的」 → 右上角扫一扫
-            <br />
-            登录后所有歌返回 320kbps 完整音频（前提是你账号是 VIP）
-          </div>
-        </div>
-      ) : phase === "expired" ? (
-        <p className="mt-3 font-mono text-[12px] text-white/45">二维码过期，重新「扫码登录」。</p>
-      ) : phase === "error" ? (
-        <p className="mt-3 font-mono text-[12px] text-rose-400">错误：{errMsg}</p>
-      ) : (
-        <p className="mt-3 font-mono text-[12px] text-white/45">
-          未登录时所有带版权的歌只返回 30 秒试听。登录后能拿完整音频（前提：你账号是 VIP）。
-        </p>
-      )}
-    </section>
-  )
-}
+// NcmLoginPanel now lives in ./LoginCard.tsx (shared between Header LOGIN
+// modal and Settings).
 
 function TasteImport({ onApplied }: { onApplied: () => Promise<void> }) {
   const [paste, setPaste] = useState("")
@@ -479,19 +353,41 @@ function TasteImport({ onApplied }: { onApplied: () => Promise<void> }) {
   const [proposal, setProposal] = useState<TasteProposal | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [appliedAt, setAppliedAt] = useState<number | null>(null)
+  // Live progress while Claude is streaming back
+  const [phase, setPhase] = useState<"idle" | "spawn" | "thinking" | "writing" | "parsing" | "done">("idle")
+  const [phaseNote, setPhaseNote] = useState<string>("")
+  const [partialChars, setPartialChars] = useState(0)
+  const [partialPreview, setPartialPreview] = useState("")
+  const [elapsedSec, setElapsedSec] = useState(0)
+
+  // Tick elapsed timer while analyzing
+  useEffect(() => {
+    if (!analyzing) return
+    const t0 = Date.now()
+    const id = window.setInterval(() => setElapsedSec(Math.round((Date.now() - t0) / 1000)), 1000)
+    return () => window.clearInterval(id)
+  }, [analyzing])
 
   const analyze = async () => {
     setErr(null)
     setProposal(null)
+    setPartialChars(0)
+    setPartialPreview("")
+    setPhase("idle")
+    setPhaseNote("")
+    setElapsedSec(0)
     if (paste.trim().length < 4) {
       setErr("先粘几首歌进来再让 Claude 分析吧")
       return
     }
     setAnalyzing(true)
     try {
-      const r = await api.analyzeTaste(paste)
-      if (r.error) throw new Error(r.error)
-      setProposal(r.proposal ?? null)
+      const final = await api.analyzeTasteStream(paste, ev => {
+        if (ev.kind === "phase") { setPhase(ev.phase); setPhaseNote(ev.note ?? "") }
+        else if (ev.kind === "partial") { setPartialChars(ev.chars); setPartialPreview(ev.preview) }
+        else if (ev.kind === "error") setErr(ev.message)
+      })
+      setProposal(final)
     } catch (e) {
       setErr((e as Error).message)
     } finally {
@@ -564,6 +460,43 @@ function TasteImport({ onApplied }: { onApplied: () => Promise<void> }) {
           </button>
         </div>
       </div>
+
+      {/* Live progress UI: phase chips + preview text streaming in */}
+      {(analyzing || (phase !== "idle" && phase !== "done")) && (
+        <div className="mt-3 rounded-xl border border-white/8 bg-black/30 p-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {(["spawn", "thinking", "writing", "parsing", "done"] as const).map(p => {
+              const order = ["idle", "spawn", "thinking", "writing", "parsing", "done"]
+              const reached = order.indexOf(phase) >= order.indexOf(p)
+              const active = phase === p
+              const label = p === "spawn" ? "唤起 Claude" : p === "thinking" ? "思考中" : p === "writing" ? "在写提案" : p === "parsing" ? "整理" : "完成"
+              return (
+                <span
+                  key={p}
+                  className={clsx(
+                    "rounded-full px-2 py-0.5 font-pixel text-[10px] tracking-[0.16em] transition-colors",
+                    active && "bg-[#29ffb8]/15 text-[#29ffb8]",
+                    !active && reached && "bg-white/10 text-white/70",
+                    !reached && "bg-white/5 text-white/30",
+                  )}
+                >
+                  {label}
+                </span>
+              )
+            })}
+            <span className="ml-auto font-mono text-[10px] tabular-nums text-white/45">
+              {elapsedSec}s · {partialChars} chars
+            </span>
+          </div>
+          {phaseNote && <p className="mt-2 font-mono text-[10px] text-white/55">{phaseNote}</p>}
+          {partialPreview && (
+            <p className="thin-scroll mt-2 max-h-24 overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-snug text-white/60">
+              …{partialPreview}
+            </p>
+          )}
+        </div>
+      )}
+
       {err && <p className="mt-2 font-mono text-[11px] text-rose-400">{err}</p>}
 
       {proposal && (

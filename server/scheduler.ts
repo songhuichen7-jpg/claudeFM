@@ -1,7 +1,28 @@
 import cron from "node-cron"
 import { runScheduledBroadcast, type DJTurn } from "./router.js"
-import { Plays, SchedulerLog } from "./state.js"
+import { Plays, Prefs, SchedulerLog } from "./state.js"
+import { todayCalendar, calendarEnabled } from "./feishu.js"
 import type { Hub } from "./hub.js"
+
+// How far ahead we look for the next event. Tuned for "give me a song that
+// matches the mood right before a meeting" — too early and it's noise, too
+// late and the broadcast eats into the meeting.
+const CAL_LOOKAHEAD_MS = 10 * 60_000
+
+/** Returns the next un-announced event in the lookahead window, or null. */
+async function nextUpcomingEvent(now: number) {
+  if (!calendarEnabled()) return null
+  const events = await todayCalendar()
+  const horizon = now + CAL_LOOKAHEAD_MS
+  for (const ev of events) {
+    if (ev.start <= now) continue        // already started / finished
+    if (ev.start > horizon) continue      // too far out
+    const announceKey = `cal_announced_${ev.id}`
+    if (Prefs.get(announceKey)) continue  // already announced this turn
+    return { ev, announceKey }
+  }
+  return null
+}
 
 /** Public read-only state of the current mood probe for diagnostics. */
 export type MoodReport = {
@@ -86,7 +107,27 @@ export function startScheduler(hub: Hub) {
     hub.broadcast({ type: "dj", turn })
   })
 
-  console.log("[scheduler] cron jobs armed: 07:00 daily plan, 09:00 morning, hourly mood probe")
+  // 每 5 分钟 — 日历事件 hook
+  // Looks ahead 10 minutes; if a meeting / event is about to start, gives
+  // Claudio one shot to play a transitional track. Dedup by event_id so a
+  // 20-minute event window doesn't get announced 4 times.
+  cron.schedule("*/5 * * * *", async () => {
+    const now = Date.now()
+    const hit = await nextUpcomingEvent(now)
+    if (!hit) return
+    const { ev, announceKey } = hit
+    Prefs.set(announceKey, String(now))
+    const minutes = Math.max(1, Math.round((ev.start - now) / 60_000))
+    SchedulerLog.add("calendar_hook", `${ev.id}: ${ev.title} (in ${minutes}min)`)
+    const reason = `${minutes} 分钟后日历事件「${ev.title}」要开始了，给我一首匹配当下场景的过渡曲——不要打断，能自然听完一段。`
+    const turn = await runScheduledBroadcast(reason)
+    hub.broadcast({ type: "dj", turn })
+  })
+
+  console.log(
+    "[scheduler] cron jobs armed: 07:00 daily plan, 09:00 morning, hourly mood probe" +
+      (calendarEnabled() ? ", 5-min calendar hook" : " (calendar disabled — set LARK_APP_ID/LARK_APP_SECRET/LARK_CALENDAR_ID to enable)"),
+  )
 }
 
 export function manualTrigger(

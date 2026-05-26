@@ -4,7 +4,7 @@ import { usePlayer } from "../state/PlayerContext"
 import type { ChatMessage, DJMessage, Track } from "../data/types"
 
 export function ChatStream() {
-  const { messages, activeDJId, djElapsedMs, replayDJ, selectTrack } = usePlayer()
+  const { messages, activeDJId, djElapsedMs, replayDJ, selectTrack, favsMode, liked } = usePlayer()
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -13,12 +13,27 @@ export function ChatStream() {
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
   }, [messages.length])
 
+  // When FAV is on, drop any DJ broadcast whose first recommended track is
+  // not liked. User + system messages stay so the chat keeps its rhythm.
+  const visible = favsMode
+    ? messages.filter(m => {
+        if (m.kind !== "dj") return true
+        const first = m.recommends?.[0]
+        return !!(first && liked[first.id])
+      })
+    : messages
+
   return (
     <div className="mx-3 mb-3 flex-1 overflow-hidden">
       <div className="flex items-center justify-between border-t border-white/8 px-1 pt-3 pb-1 light:border-black/10">
         <div className="flex items-center gap-2 text-white/85 light:text-black/80">
           <span className="live-dot inline-block h-1.5 w-1.5 rounded-full bg-[#29ffb8]" />
           <span className="font-pixel text-[12px] tracking-[0.18em]">Claudio</span>
+          {favsMode && (
+            <span className="font-pixel text-[10px] tracking-[0.18em] text-pink-300 light:text-pink-700">
+              · FAV ONLY
+            </span>
+          )}
         </div>
         <span className="font-pixel text-[10px] tracking-[0.22em] text-[#0a8e6a] dark:text-[#29ffb8]">LIVE</span>
       </div>
@@ -27,16 +42,24 @@ export function ChatStream() {
         ref={ref}
         className="thin-scroll relative h-full max-h-[320px] overflow-y-auto pr-1 pb-2 pt-1"
       >
-        {messages.map(m => (
-          <Row
-            key={m.id}
-            msg={m}
-            activeDJId={activeDJId}
-            djElapsedMs={djElapsedMs}
-            onReplay={replayDJ}
-            onPlayTrack={selectTrack}
-          />
-        ))}
+        {visible.length === 0 ? (
+          <div className="my-6 text-center font-mono text-[12px] text-white/35 light:text-black/35">
+            {favsMode
+              ? "FAV 模式下还没有收藏的播报。点 ♡ 把当前这首收进来。"
+              : "（等 Claudio 上线…）"}
+          </div>
+        ) : (
+          visible.map(m => (
+            <Row
+              key={m.id}
+              msg={m}
+              activeDJId={activeDJId}
+              djElapsedMs={djElapsedMs}
+              onReplay={replayDJ}
+              onPlayTrack={selectTrack}
+            />
+          ))
+        )}
       </div>
     </div>
   )
@@ -167,7 +190,7 @@ function TrackCard({ track, onPlay }: { track: Track; onPlay: () => void }) {
       <div className="min-w-0 flex-1">
         <div className="truncate font-serif text-[14px] leading-tight text-white/95 light:text-black/85">
           <span className="italic">{track.title}</span>
-          <span className="mx-1 text-white/30">·</span>
+          <span className="mx-1 text-white/30 light:text-black/30">·</span>
           <span className="text-white/70 light:text-black/65">{track.artist}</span>
         </div>
         {track.era && (

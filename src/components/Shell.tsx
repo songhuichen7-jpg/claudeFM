@@ -20,7 +20,29 @@ export function Shell({ children }: { children: ReactNode }) {
         )}
       >
         <NoiseLayer />
+        <NotMasterBanner />
         {children}
+      </div>
+    </div>
+  )
+}
+
+function NotMasterBanner() {
+  const { isAudioMaster, claimAudioMaster } = usePlayer()
+  if (isAudioMaster) return null
+  return (
+    <div className="border-b border-amber-400/30 bg-amber-400/10 px-4 py-2 dark:bg-amber-400/10 light:bg-amber-200/40">
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-mono text-[11px] leading-snug text-amber-200/90 dark:text-amber-200/90 light:text-amber-900/85">
+          正在另一个标签里播放
+        </span>
+        <button
+          type="button"
+          onClick={claimAudioMaster}
+          className="rounded-full border border-amber-400/40 px-2.5 py-0.5 font-pixel text-[10px] tracking-[0.18em] text-amber-100 hover:bg-amber-400/20 dark:text-amber-100 light:border-amber-700/40 light:text-amber-900 light:hover:bg-amber-300/30"
+        >
+          切到本标签
+        </button>
       </div>
     </div>
   )

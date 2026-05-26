@@ -29,6 +29,7 @@ export function Player({ onOpenFocus }: PlayerProps) {
     volume,
     liked,
     hideChat,
+    favsMode,
     togglePlay,
     next,
     prev,
@@ -37,6 +38,7 @@ export function Player({ onOpenFocus }: PlayerProps) {
     setVolume,
     seek,
     toggleHideChat,
+    toggleFavsMode,
   } = usePlayer()
 
   const totalSec = currentTrack?.duration ?? duration ?? 0
@@ -59,7 +61,7 @@ export function Player({ onOpenFocus }: PlayerProps) {
         <div className="min-w-0 flex-1">
           <div className="truncate font-serif text-[19px] leading-tight text-white light:text-black/90">
             <span className="italic">{title}</span>
-            <span className="mx-1.5 text-white/30">—</span>
+            <span className="mx-1.5 text-white/30 light:text-black/30">—</span>
             <span className="text-white/85 light:text-black/75">{artist}</span>
           </div>
           <div className="font-pixel text-[10px] tracking-[0.28em] text-[#0a8e6a] dark:text-[#29ffb8]">
@@ -90,7 +92,15 @@ export function Player({ onOpenFocus }: PlayerProps) {
           </button>
           <button
             type="button"
-            className="rounded-md px-2 py-1 font-pixel text-[10px] tracking-[0.22em] text-white/55 hover:bg-white/5 hover:text-white/85 light:text-black/55 light:hover:bg-black/5 light:hover:text-black/80"
+            onClick={toggleFavsMode}
+            aria-pressed={favsMode}
+            title="只看收藏的播报"
+            className={clsx(
+              "rounded-md px-2 py-1 font-pixel text-[10px] tracking-[0.22em] transition-colors",
+              favsMode
+                ? "bg-pink-400/15 text-pink-300 light:bg-pink-500/15 light:text-pink-700"
+                : "text-white/55 hover:bg-white/5 hover:text-white/85 light:text-black/55 light:hover:bg-black/5 light:hover:text-black/80",
+            )}
           >
             FAV
           </button>

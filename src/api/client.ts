@@ -1,4 +1,4 @@
-import type { ChatMessage, Track } from "../data/types"
+import type { ChatMessage, DJSegment, Track } from "../data/types"
 
 export type ServerTrack = {
   id: string
@@ -19,6 +19,8 @@ export type DJTurn = {
   source?: "user" | "scheduler" | "manual" | "next"
   reason?: string
   segue?: string
+  /** Human-readable broadcast segment (e.g. "Monday Night Exhale"). */
+  segment?: string
   tracks: ServerTrack[]
   ts: number
 }
@@ -29,7 +31,13 @@ export type ServerMessage = {
   kind: "dj" | "user" | "system"
   speaker: string | null
   text: string
-  meta: { tracks?: ServerTrack[]; ttsUrl?: string; reason?: string; segue?: string } | null
+  meta: {
+    tracks?: ServerTrack[]
+    ttsUrl?: string
+    reason?: string
+    segue?: string
+    segment?: string
+  } | null
 }
 
 const BASE = "" // same-origin (Vite proxies /api and /tts to :8080)
@@ -68,6 +76,49 @@ export type TasteProposal = {
   detected_tracks: { title: string; artist: string }[]
 }
 
+export type AnalyzeStreamEvent =
+  | { kind: "phase"; phase: "spawn" | "thinking" | "writing" | "parsing" | "done"; note?: string }
+  | { kind: "partial"; chars: number; preview: string }
+  | { kind: "error"; message: string }
+  | { kind: "result"; proposal: TasteProposal }
+
+async function streamSse(
+  path: string,
+  body: unknown,
+  onEvent: (e: AnalyzeStreamEvent) => void,
+): Promise<TasteProposal | null> {
+  const r = await fetch(BASE + path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+  if (!r.ok || !r.body) throw new Error(`SSE ${path} ${r.status}`)
+  const reader = r.body.getReader()
+  const dec = new TextDecoder()
+  let buf = ""
+  let result: TasteProposal | null = null
+  while (true) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buf += dec.decode(value, { stream: true })
+    let idx: number
+    while ((idx = buf.indexOf("\n\n")) !== -1) {
+      const chunk = buf.slice(0, idx)
+      buf = buf.slice(idx + 2)
+      const dataLine = chunk.split("\n").find(l => l.startsWith("data:"))
+      if (!dataLine) continue
+      const raw = dataLine.slice(5).trim()
+      if (!raw) continue
+      try {
+        const ev = JSON.parse(raw) as AnalyzeStreamEvent
+        onEvent(ev)
+        if (ev.kind === "result") result = ev.proposal
+      } catch {}
+    }
+  }
+  return result
+}
+
 export const api = {
   health: () => jget<{ ok: boolean; claude: boolean; calendar: boolean; naim: boolean; weather: boolean; fish: boolean; mimo: boolean; ttsProvider: "mimo" | "fish" | "silent"; activeProfile: string; moodProbe: unknown }>("/api/health"),
   messages: () => jget<{ messages: ServerMessage[] }>("/api/messages"),
@@ -80,6 +131,8 @@ export const api = {
     jpost<{ ok: true }>("/api/trigger", { reason, source }),
   analyzeTaste: (paste: string) =>
     jpost<{ proposal?: TasteProposal; error?: string }>("/api/taste/analyze", { paste }),
+  analyzeTasteStream: (paste: string, onEvent: (e: AnalyzeStreamEvent) => void): Promise<TasteProposal | null> =>
+    streamSse("/api/taste/analyze?stream=1", { paste }, onEvent),
   applyTaste: (body: { taste_md?: string; playlists_json?: unknown }) =>
     jpost<{ ok: boolean; written?: string[]; error?: string }>("/api/taste/apply", body),
   ncmStatus: () =>
@@ -98,9 +151,10 @@ export const api = {
 export function wordsFromText(
   text: string,
   perWordMs = 220,
+  cursorStart = 0,
 ): Array<{ text: string; start: number; end: number }> {
   const tokens = text.split(/(\s+)/)
-  let cursor = 0
+  let cursor = cursorStart
   const out: { text: string; start: number; end: number }[] = []
   for (const t of tokens) {
     if (!t.trim()) {
@@ -115,6 +169,39 @@ export function wordsFromText(
     cursor += ms
   }
   return out
+}
+
+/**
+ * Split DJ say-text into sentence-sized segments with broadcast-relative
+ * timing. FocusView uses this to render the transcript the way the spec
+ * screenshot does: "Claudio · 0:01 / 0:05 / 0:14" — each sentence its own
+ * timestamped block, only the active sentence highlights word-by-word.
+ *
+ * Boundaries are 。 . ! ? ！ ？ \n. The trailing punctuation stays attached
+ * to the sentence it ended.
+ */
+export function sentencesFromText(text: string): DJSegment[] {
+  const matches: string[] = []
+  const re = /[^。.!?！？\n]+[。.!?！？]?/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) {
+    const part = m[0].trim()
+    if (part) matches.push(part)
+  }
+  if (matches.length === 0 && text.trim()) matches.push(text.trim())
+
+  const segments: DJSegment[] = []
+  let cursor = 0
+  for (const part of matches) {
+    const words = wordsFromText(part, 220, cursor)
+    const visible = words.filter(w => w.text.trim())
+    if (visible.length === 0) continue
+    const startMs = visible[0].start
+    const endMs = visible[visible.length - 1].end
+    segments.push({ text: part, startMs, endMs, words })
+    cursor = endMs + 80 // small breath between sentences
+  }
+  return segments
 }
 
 export function serverTrackToUI(t: ServerTrack): Track & { url: string; cover?: string } {
@@ -140,7 +227,8 @@ export function serverMessagesToUI(msgs: ServerMessage[]): ChatMessage[] {
       return { id: m.id, kind: "user", speaker: m.speaker ?? "you", timestamp: stamp, text: m.text }
     }
     // dj
-    const words = wordsFromText(m.text)
+    const segments = sentencesFromText(m.text)
+    const words = segments.flatMap(s => s.words)
     const tracks = m.meta?.tracks?.map(serverTrackToUI) ?? []
     return {
       id: m.id,
@@ -149,6 +237,8 @@ export function serverMessagesToUI(msgs: ServerMessage[]): ChatMessage[] {
       timestamp: stamp,
       text: m.text,
       words,
+      segments,
+      segment: m.meta?.segment,
       duration: words.reduce((acc, w) => Math.max(acc, w.end), 0),
       recommends: tracks,
       hasReplay: true,

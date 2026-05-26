@@ -22,7 +22,7 @@ import {
 import { claudeAvailable } from "./claude.js"
 import { CACHE_DIR as TTS_DIR, ttsProvider } from "./tts.js"
 import { getWeather } from "./weather.js"
-import { calendarEnabled } from "./feishu.js"
+import { calendarEnabled, todayCalendar } from "./feishu.js"
 import { naimEnabled } from "./naim.js"
 import { activeCorpusDir } from "./context.js"
 
@@ -205,6 +205,13 @@ fastify.delete<{ Params: { id: string } }>("/api/profiles/:id", async (req, repl
 
 fastify.get("/api/mood", async () => ({ last: lastMoodReport() }))
 
+// Debug: surface whatever Feishu hands back for today, so the user can see
+// if their LARK_* env vars are wired correctly without waiting for the cron.
+fastify.get("/api/calendar", async () => ({
+  enabled: calendarEnabled(),
+  events: await todayCalendar(),
+}))
+
 // ---- NCM 账号登录 (扫码) ---------------------------------------------------
 
 fastify.get("/api/ncm/status", async () => {
@@ -273,7 +280,7 @@ fastify.post("/api/like", async (req) => {
 
 // ---- taste import / analysis ---------------------------------------------
 
-fastify.post<{ Body: { paste?: string } }>("/api/taste/analyze", async (req, reply) => {
+fastify.post<{ Body: { paste?: string }; Querystring: { stream?: string } }>("/api/taste/analyze", async (req, reply) => {
   const paste = String(req.body?.paste ?? "").trim()
   if (paste.length < 4) {
     reply.code(400)
@@ -283,6 +290,28 @@ fastify.post<{ Body: { paste?: string } }>("/api/taste/analyze", async (req, rep
     reply.code(413)
     return { error: "paste too large (>60KB)" }
   }
+
+  // Streaming path: SSE with phase / partial / result / error events.
+  if (req.query?.stream === "1") {
+    reply.raw.setHeader("Content-Type", "text/event-stream")
+    reply.raw.setHeader("Cache-Control", "no-cache")
+    reply.raw.setHeader("Connection", "keep-alive")
+    reply.raw.setHeader("X-Accel-Buffering", "no") // disable proxy buffering
+    reply.raw.flushHeaders?.()
+    const send = (ev: unknown) => {
+      try { reply.raw.write(`data: ${JSON.stringify(ev)}\n\n`) } catch {}
+    }
+    const { analyzePasteStream } = await import("./taste-analyze.js")
+    try {
+      await analyzePasteStream(paste, send)
+    } catch (err) {
+      send({ kind: "error", message: (err as Error).message })
+    }
+    try { reply.raw.end() } catch {}
+    return reply
+  }
+
+  // Legacy non-streaming path (kept for tooling / curl).
   const { analyzePasteRaw } = await import("./taste-analyze.js")
   try {
     const proposal = await analyzePasteRaw(paste)

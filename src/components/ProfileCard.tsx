@@ -14,9 +14,9 @@ const GENRES = [
   "SHIBUYA-KEI",
 ]
 
-type Props = { open: boolean; onClose: () => void }
+type Props = { open: boolean; onClose: () => void; onOpenSettings?: () => void }
 
-export function ProfileCard({ open, onClose }: Props) {
+export function ProfileCard({ open, onClose, onOpenSettings }: Props) {
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
@@ -92,9 +92,17 @@ export function ProfileCard({ open, onClose }: Props) {
           ))}
         </div>
 
-        <div className="relative mt-5 flex items-center justify-between font-pixel text-[10px] tracking-[0.28em] text-white/35">
+        <div className="relative mt-5 flex items-center justify-between gap-3 font-pixel text-[10px] tracking-[0.28em] text-white/35">
           <span>CLAUDE × MMGUO</span>
-          <span>FM</span>
+          {onOpenSettings && (
+            <button
+              type="button"
+              onClick={() => { onOpenSettings(); onClose() }}
+              className="rounded-full border border-white/15 px-2.5 py-1 text-[10px] text-white/65 hover:bg-white/8 hover:text-white sm:hidden"
+            >
+              SETTINGS
+            </button>
+          )}
         </div>
       </div>
     </div>

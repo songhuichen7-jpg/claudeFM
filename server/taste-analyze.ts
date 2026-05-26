@@ -378,6 +378,145 @@ function parseSectionedResponse(text: string): TasteProposal | null {
   }
 }
 
+/**
+ * Streaming analyse — emits phase + partial events while claude is running.
+ * Caller passes onEvent and gets a promise resolving to the final proposal.
+ */
+export type AnalyzeStreamEvent =
+  | { kind: "phase"; phase: "spawn" | "thinking" | "writing" | "parsing" | "done"; note?: string }
+  | { kind: "partial"; chars: number; preview: string }
+  | { kind: "error"; message: string }
+  | { kind: "result"; proposal: TasteProposal }
+
+export async function analyzePasteStream(
+  paste: string,
+  onEvent: (e: AnalyzeStreamEvent) => void,
+): Promise<TasteProposal | null> {
+  const dir = activeCorpusDir()
+  let tasteMd = ""
+  let playlistsJson = ""
+  try { tasteMd = await readFile(join(dir, "taste.md"), "utf-8") } catch {}
+  try { playlistsJson = await readFile(join(dir, "playlists.json"), "utf-8") } catch {}
+
+  const userPrompt = [
+    "<CURRENT_CORPUS>",
+    "## taste.md",
+    "```markdown",
+    tasteMd,
+    "```",
+    "",
+    "## playlists.json",
+    "```json",
+    playlistsJson,
+    "```",
+    "</CURRENT_CORPUS>",
+    "",
+    "<NEW_LISTENING>",
+    paste.trim(),
+    "</NEW_LISTENING>",
+    "",
+    "现在按输出协议给我新的 taste_md + playlists_json + detected_tracks。",
+  ].join("\n")
+  const combined = `${SYSTEM}\n\n---\n\n${userPrompt}`
+
+  onEvent({ kind: "phase", phase: "spawn", note: "唤起 Claude" })
+
+  return new Promise<TasteProposal | null>((resolve) => {
+    const proc = spawn(process.env.CLAUDE_BIN || "claude", [
+      "-p",
+      combined,
+      "--output-format", "stream-json",
+      "--include-partial-messages",
+      "--verbose",
+      "--model", "claude-sonnet-4-6",
+    ], { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env } })
+
+    let buf = ""
+    let textAcc = ""
+    type Phase = "spawn" | "thinking" | "writing" | "parsing" | "done"
+    let phase: Phase = "spawn"
+    let lastPartialEmit = 0
+
+    const transitionPhase = (next: Phase, note?: string) => {
+      if (next === phase) return
+      phase = next
+      onEvent({ kind: "phase", phase: next, note })
+    }
+
+    proc.stdout.on("data", (chunk) => {
+      buf += chunk.toString()
+      let nl: number
+      while ((nl = buf.indexOf("\n")) !== -1) {
+        const line = buf.slice(0, nl).trim()
+        buf = buf.slice(nl + 1)
+        if (!line) continue
+        let obj: any
+        try { obj = JSON.parse(line) } catch { continue }
+        // Phase transitions
+        if (obj.type === "system" && obj.subtype === "status" && obj.status === "requesting") {
+          transitionPhase("thinking", "Claude 正在分析你的语料和歌单")
+          continue
+        }
+        if (obj.type === "stream_event") {
+          const ev = obj.event
+          if (ev?.type === "content_block_start") {
+            if (ev.content_block?.type === "thinking") {
+              transitionPhase("thinking")
+            } else if (ev.content_block?.type === "text") {
+              transitionPhase("writing", "Claude 在写提案")
+            }
+            continue
+          }
+          if (ev?.type === "content_block_delta" && ev.delta?.type === "text_delta") {
+            const t: string = ev.delta.text ?? ""
+            textAcc += t
+            // throttle partial emits to once every ~400ms
+            const now = Date.now()
+            if (now - lastPartialEmit > 350) {
+              lastPartialEmit = now
+              onEvent({ kind: "partial", chars: textAcc.length, preview: textAcc.slice(-180) })
+            }
+          }
+        }
+      }
+    })
+
+    const timeout = setTimeout(() => {
+      try { proc.kill("SIGKILL") } catch {}
+      onEvent({ kind: "error", message: "claude analyze: timed out after 1200s" })
+      resolve(null)
+    }, 1200_000)
+
+    proc.on("error", (err) => {
+      clearTimeout(timeout)
+      onEvent({ kind: "error", message: `spawn failed: ${(err as Error).message}` })
+      resolve(null)
+    })
+
+    proc.on("close", (code) => {
+      clearTimeout(timeout)
+      if (code !== 0) {
+        onEvent({ kind: "error", message: `claude exit ${code}` })
+        resolve(null)
+        return
+      }
+      transitionPhase("parsing", "解析提案")
+      const proposal = parseSectionedResponse(textAcc)
+      if (!proposal) {
+        onEvent({ kind: "error", message: `cannot parse output (len=${textAcc.length})` })
+        try {
+          import("node:fs").then(fs => fs.writeFileSync("/tmp/claude-analyze-stream-failed.txt", textAcc)).catch(() => undefined)
+        } catch {}
+        resolve(null)
+        return
+      }
+      transitionPhase("done")
+      onEvent({ kind: "result", proposal })
+      resolve(proposal)
+    })
+  })
+}
+
 function extractJSON(text: string): any | null {
   try { return JSON.parse(text.trim()) } catch {}
   // Strip a possible ```json … ``` outer fence WITHOUT greedy-matching the

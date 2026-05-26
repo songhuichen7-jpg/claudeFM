@@ -17,8 +17,39 @@ export type DJTurn = {
   source: "user" | "scheduler" | "manual" | "next"
   reason?: string
   segue?: string
+  /** Human-readable segment label tied to the broadcast time, e.g.
+   *  "Monday Night Exhale" / "Deep Focus" / "Tuesday Morning Glow".
+   *  Shown as the headline in the focus / detail view. */
+  segment: string
   tracks: ResolvedTrack[]
   ts: number
+}
+
+const WEEKDAYS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const
+
+/**
+ * Map broadcast time → segment label. The 0:00-04:59 wedge folds back to
+ * the previous evening so a Monday 02:00 turn still reads "Monday Night
+ * Exhale" rather than jumping to Tuesday morning.
+ */
+export function computeSegment(ts: number): string {
+  const d = new Date(ts)
+  const hr = d.getHours()
+  if (hr >= 5 && hr < 10) return `${WEEKDAYS[d.getDay()]} Morning Glow`
+  if (hr >= 10 && hr < 14) return "Deep Focus"
+  if (hr >= 14 && hr < 18) return "Afternoon Drift"
+  if (hr >= 18 && hr < 22) return `${WEEKDAYS[d.getDay()]} Sundown`
+  // 22-04:59 → folds back to last evening's weekday
+  const eveningDay = hr < 5 ? (d.getDay() + 6) % 7 : d.getDay()
+  return `${WEEKDAYS[eveningDay]} Night Exhale`
 }
 
 /**
@@ -178,6 +209,7 @@ async function finalize({
 }): Promise<DJTurn> {
   const ts = Date.now()
   const id = `dj-${ts}`
+  const segment = computeSegment(ts)
   const tts = await synthesize(say)
   Messages.insert({
     id,
@@ -185,7 +217,7 @@ async function finalize({
     kind: "dj",
     speaker: "Claudio",
     text: say,
-    meta: { tracks, ttsUrl: tts.url, source, reason, segue },
+    meta: { tracks, ttsUrl: tts.url, source, reason, segue, segment },
   })
   // Record first play so memory accumulates (skip flag stays 0 until user skips)
   if (tracks.length > 0) {
@@ -201,5 +233,5 @@ async function finalize({
       pushToRoom(t.url, t.title, t.artist).catch(() => undefined)
     }
   }
-  return { id, say, ttsUrl: tts.url, ttsSilent: tts.silent, source, reason, segue, tracks, ts }
+  return { id, say, ttsUrl: tts.url, ttsSilent: tts.silent, source, reason, segue, segment, tracks, ts }
 }

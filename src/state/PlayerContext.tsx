@@ -9,7 +9,9 @@ import {
   type ReactNode,
 } from "react"
 import type { ChatMessage, DJMessage, Theme, Track } from "../data/types"
-import { api, serverMessagesToUI, serverTrackToUI, wordsFromText, type DJTurn, type ServerTrack } from "../api/client"
+import { api, sentencesFromText, serverMessagesToUI, serverTrackToUI, type DJTurn, type ServerTrack } from "../api/client"
+import { TabMaster } from "./tabMaster"
+import { installDucking, type DuckingHandle } from "../audio/ducking"
 
 export type Profile = { id: string; name: string; avatar: string | null; corpus_dir: string; created_at: number }
 
@@ -48,6 +50,9 @@ type PlayerState = {
   // ui
   theme: Theme
   hideChat: boolean
+  /** True when the user pressed FAV — ChatStream then filters out any DJ
+   *  broadcast whose first recommended track is not in `liked`. */
+  favsMode: boolean
   status: "idle" | "thinking" | "speaking" | "playing" | "error"
 
   // chat
@@ -58,6 +63,10 @@ type PlayerState = {
   // server status
   health: Health | null
   connected: boolean
+
+  // multi-tab audio coordination
+  isAudioMaster: boolean
+  claimAudioMaster: () => void
 
   // analyser (real audio waveform)
   analyserRef: React.MutableRefObject<AnalyserHandle>
@@ -75,6 +84,7 @@ type PlayerState = {
   // actions
   toggleTheme: () => void
   toggleHideChat: () => void
+  toggleFavsMode: () => void
   togglePlay: () => void
   setPlaying: (v: boolean) => void
   next: () => void
@@ -104,6 +114,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     return window.localStorage.getItem("claudio-theme") === "light" ? "light" : "dark"
   })
   const [hideChat, setHideChat] = useState(false)
+  const [favsMode, setFavsMode] = useState(false)
   const [status, setStatus] = useState<PlayerState["status"]>("idle")
 
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -113,6 +124,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [health, setHealth] = useState<Health | null>(null)
   const [connected, setConnected] = useState(false)
   const [profiles, setProfiles] = useState<Profile[]>([])
+  const [isAudioMaster, setIsAudioMaster] = useState(true) // optimistic — TabMaster overwrites after election
+  const tabMasterRef = useRef<TabMaster | null>(null)
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const ttsRef = useRef<HTMLAudioElement | null>(null)
@@ -138,6 +151,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const ttsAnalyserRef = useRef<AnalyserNode | null>(null)
   const audioSrcRef = useRef<MediaElementAudioSourceNode | null>(null)
   const ttsSrcRef = useRef<MediaElementAudioSourceNode | null>(null)
+  const duckingRef = useRef<DuckingHandle | null>(null)
   const analyserRef = useRef<AnalyserHandle>({ freq: null, level: 0, isAudio: false, channel: null })
 
   useEffect(() => {
@@ -157,6 +171,28 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       recentTracksRef.current.set(lastTrack.id, lastTrack)
     }
     return ui
+  }, [])
+
+  // Multi-tab coordination: only the master tab plays audio.
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const tm = new TabMaster()
+    tabMasterRef.current = tm
+    const unsub = tm.subscribe(ev => {
+      setIsAudioMaster(ev.kind === "become-master")
+      if (ev.kind === "lost-master") {
+        // Pause everything immediately so two tabs don't bleed audio
+        try { audioRef.current?.pause() } catch {}
+        try { ttsRef.current?.pause() } catch {}
+        setIsPlaying(false)
+      }
+    })
+    tm.start()
+    return () => { unsub(); tm.stop() }
+  }, [])
+
+  const claimAudioMaster = useCallback(() => {
+    tabMasterRef.current?.claim()
   }, [])
 
   // Initialize hidden audio elements + analyser graph
@@ -198,12 +234,19 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         if (dj.ttsUrl !== tts.src && !tts.src.endsWith(dj.ttsUrl ?? "")) return m
         if (!dj.words.length) return m
         const scale = realMs / Math.max(1, dj.duration)
-        const scaled = dj.words.map(w => ({
+        const scaleWord = (w: { text: string; start: number; end: number }) => ({
           text: w.text,
           start: Math.round(w.start * scale),
           end: Math.round(w.end * scale),
+        })
+        const scaledWords = dj.words.map(scaleWord)
+        const scaledSegments = dj.segments.map(s => ({
+          text: s.text,
+          startMs: Math.round(s.startMs * scale),
+          endMs: Math.round(s.endMs * scale),
+          words: s.words.map(scaleWord),
         }))
-        return { ...dj, duration: realMs, words: scaled }
+        return { ...dj, duration: realMs, words: scaledWords, segments: scaledSegments }
       }))
     }
     tts.addEventListener("loadedmetadata", ttsMeta)
@@ -215,6 +258,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       a.removeEventListener("ended", onEnded)
       tts.removeEventListener("loadedmetadata", ttsMeta)
       a.pause(); tts.pause(); prefetch.pause()
+      duckingRef.current?.stop()
+      duckingRef.current = null
     }
   }, [])
 
@@ -227,33 +272,63 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (!Ctx) return null
     const ctx = new Ctx()
     audioCtxRef.current = ctx
+
+    // 1) Allocate src + analyser for both channels (no connections yet — we
+    //    need the TTS analyser to exist before ducking can subscribe to it).
+    let bgmSrc: MediaElementAudioSourceNode | null = null
+    let bgmAn: AnalyserNode | null = null
+    let ttsSrc: MediaElementAudioSourceNode | null = null
+    let ttsAn: AnalyserNode | null = null
     if (audioRef.current) {
       try {
-        const src = ctx.createMediaElementSource(audioRef.current)
-        const an = ctx.createAnalyser()
-        an.fftSize = 256
-        an.smoothingTimeConstant = 0.78
-        src.connect(an)
-        an.connect(ctx.destination)
-        audioSrcRef.current = src
-        audioAnalyserRef.current = an
+        bgmSrc = ctx.createMediaElementSource(audioRef.current)
+        bgmAn = ctx.createAnalyser()
+        bgmAn.fftSize = 256
+        bgmAn.smoothingTimeConstant = 0.78
       } catch (err) {
-        console.warn("audio analyser hookup failed", err)
+        console.warn("audio analyser create failed", err)
       }
     }
     if (ttsRef.current) {
       try {
-        const src = ctx.createMediaElementSource(ttsRef.current)
-        const an = ctx.createAnalyser()
-        an.fftSize = 256
-        an.smoothingTimeConstant = 0.78
-        src.connect(an)
-        an.connect(ctx.destination)
-        ttsSrcRef.current = src
-        ttsAnalyserRef.current = an
+        ttsSrc = ctx.createMediaElementSource(ttsRef.current)
+        ttsAn = ctx.createAnalyser()
+        ttsAn.fftSize = 256
+        ttsAn.smoothingTimeConstant = 0.78
       } catch (err) {
-        console.warn("tts analyser hookup failed", err)
+        console.warn("tts analyser create failed", err)
       }
+    }
+
+    // 2) Install ducking off the TTS analyser. It returns a GainNode we
+    //    splice into the BGM chain so Claudio "talks over" the music.
+    let ducking: DuckingHandle | null = null
+    if (ttsAn) {
+      try {
+        ducking = installDucking(ctx, ttsAn)
+        duckingRef.current = ducking
+      } catch (err) {
+        console.warn("ducking install failed", err)
+      }
+    }
+
+    // 3) Wire the chains: BGM goes through musicGain when ducking is active.
+    if (bgmSrc && bgmAn) {
+      if (ducking) {
+        bgmSrc.connect(ducking.musicGain)
+        ducking.musicGain.connect(bgmAn)
+      } else {
+        bgmSrc.connect(bgmAn)
+      }
+      bgmAn.connect(ctx.destination)
+      audioSrcRef.current = bgmSrc
+      audioAnalyserRef.current = bgmAn
+    }
+    if (ttsSrc && ttsAn) {
+      ttsSrc.connect(ttsAn)
+      ttsAn.connect(ctx.destination)
+      ttsSrcRef.current = ttsSrc
+      ttsAnalyserRef.current = ttsAn
     }
     return ctx
   }, [])
@@ -434,6 +509,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const playTrack = useCallback((t: Track) => {
     const a = audioRef.current
     if (!a || !t.url) return
+    // Multi-tab guard: only the master tab plays audio. If we're not master,
+    // remember the track for UI display but stay silent.
+    if (!tabMasterRef.current?.isMaster()) {
+      setIsPlaying(false)
+      return
+    }
     const seq = ++playSeqRef.current
     // First-play unlocks WebAudio analyser
     ensureAudioGraph()
@@ -497,7 +578,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     const stamp = new Date(turn.ts)
     const hhmm = `${String(stamp.getHours()).padStart(2, "0")}:${String(stamp.getMinutes()).padStart(2, "0")}`
-    const words = wordsFromText(turn.say)
+    const segments = sentencesFromText(turn.say)
+    const words = segments.flatMap(s => s.words)
     const dj: DJMessage = {
       id: turn.id,
       kind: "dj",
@@ -505,6 +587,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       timestamp: hhmm,
       text: turn.say,
       words,
+      segments,
+      segment: turn.segment,
       duration: words.reduce((a, w) => Math.max(a, w.end), 0) || 2500,
       recommends: turn.tracks.map(serverTrackToUI),
       hasReplay: true,
@@ -552,6 +636,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const toggleTheme = useCallback(() => setTheme(t => (t === "dark" ? "light" : "dark")), [])
   const toggleHideChat = useCallback(() => setHideChat(v => !v), [])
+  const toggleFavsMode = useCallback(() => setFavsMode(v => !v), [])
 
   const togglePlay = useCallback(() => {
     const a = audioRef.current
@@ -803,12 +888,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     liked,
     theme,
     hideChat,
+    favsMode,
     status,
     messages,
     activeDJId,
     djElapsedMs,
     health,
     connected,
+    isAudioMaster,
+    claimAudioMaster,
     analyserRef,
     profiles,
     refreshProfiles,
@@ -818,6 +906,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     saveTasteFile,
     toggleTheme,
     toggleHideChat,
+    toggleFavsMode,
     togglePlay,
     setPlaying,
     next,
@@ -832,10 +921,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     triggerScheduled,
   }), [
     currentTrack, isPlaying, currentTime, duration, volume, liked,
-    theme, hideChat, status, messages, activeDJId, djElapsedMs,
-    health, connected, profiles,
+    theme, hideChat, favsMode, status, messages, activeDJId, djElapsedMs,
+    health, connected, profiles, isAudioMaster, claimAudioMaster,
     refreshProfiles, switchProfile, createProfile, refreshTaste, saveTasteFile,
-    toggleTheme, toggleHideChat, togglePlay, setPlaying, next, prev,
+    toggleTheme, toggleHideChat, toggleFavsMode, togglePlay, setPlaying, next, prev,
     stop, toggleLike, setVolume, seek, selectTrack, sendMessage, replayDJ, triggerScheduled,
   ])
 
