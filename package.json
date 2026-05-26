@@ -6,8 +6,10 @@
   "scripts": {
     "dev:web": "vite",
     "dev:server": "tsx watch server/index.ts",
+    "dev:prototype": "vite --config prototype/vite.config.ts",
     "dev": "concurrently -n web,server -c blue,magenta \"pnpm dev:web\" \"pnpm dev:server\"",
     "build:web": "tsc -b && vite build",
+    "build:prototype": "vite build --config prototype/vite.config.ts",
     "build": "pnpm build:web",
     "start": "node --import tsx server/index.ts",
     "lint": "eslint .",
