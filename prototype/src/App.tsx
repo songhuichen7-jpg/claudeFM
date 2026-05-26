@@ -5,9 +5,8 @@ import { MoodHeader } from "./components/MoodHeader"
 import { NowPlayingHero } from "./components/NowPlayingHero"
 import { DJCaption } from "./components/DJCaption"
 import { QuickChips } from "./components/QuickChips"
-import { UpNextPreview } from "./components/UpNextPreview"
-import { ChatSheet } from "./components/ChatSheet"
-import { QueueSheet } from "./components/QueueSheet"
+import { SidePanel, type SidePanelTab } from "./components/SidePanel"
+import { Toast } from "./components/Toast"
 import { ProfileCard } from "./components/ProfileCard"
 import { FocusView } from "./components/FocusView"
 import { SettingsView } from "./components/SettingsView"
@@ -16,8 +15,7 @@ function Body() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [focusOpen, setFocusOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [chatOpen, setChatOpen] = useState(false)
-  const [queueOpen, setQueueOpen] = useState(false)
+  const [sideTab, setSideTab] = useState<SidePanelTab>("chat")
 
   return (
     <Shell>
@@ -25,16 +23,18 @@ function Body() {
         onOpenProfile={() => setProfileOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
       />
-      <NowPlayingHero onOpenFocus={() => setFocusOpen(true)} />
+      <main className="relative flex flex-1 overflow-hidden">
+        <section className="flex flex-1 flex-col items-center justify-center px-8 pb-4">
+          <div className="flex w-full max-w-[460px] flex-col">
+            <NowPlayingHero onOpenFocus={() => setFocusOpen(true)} />
+            <DJCaption onOpenChat={() => setSideTab("chat")} />
+            <QuickChips />
+          </div>
+        </section>
+        <SidePanel tab={sideTab} setTab={setSideTab} />
+      </main>
 
-      <div className="mt-auto">
-        <DJCaption onOpenChat={() => setChatOpen(true)} />
-        <QuickChips />
-        <UpNextPreview onOpenQueue={() => setQueueOpen(true)} />
-      </div>
-
-      <ChatSheet open={chatOpen} onClose={() => setChatOpen(false)} />
-      <QueueSheet open={queueOpen} onClose={() => setQueueOpen(false)} />
+      <Toast />
       <ProfileCard open={profileOpen} onClose={() => setProfileOpen(false)} />
       <FocusView open={focusOpen} onClose={() => setFocusOpen(false)} />
       <SettingsView open={settingsOpen} onClose={() => setSettingsOpen(false)} />

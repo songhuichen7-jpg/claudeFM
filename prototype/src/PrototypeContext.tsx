@@ -60,6 +60,9 @@ type State = {
 
   upcoming: { track: Track; caption: string }[]
 
+  toast: { id: number; text: string; sub?: string } | null
+  dismissToast: () => void
+
   toggleTheme: () => void
   toggleHideChat: () => void
   togglePlay: () => void
@@ -110,6 +113,19 @@ export function PrototypeProvider({ children }: { children: ReactNode }) {
     return window.localStorage.getItem("claudio-prototype-mood") ?? mockMoods[0].id
   })
   const [upcoming] = useState(mockUpcoming)
+  const [toast, setToast] = useState<State["toast"]>(null)
+  const toastTimerRef = useRef<number | null>(null)
+
+  const showToast = useCallback((text: string, sub?: string) => {
+    if (toastTimerRef.current != null) window.clearTimeout(toastTimerRef.current)
+    setToast({ id: Date.now(), text, sub })
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 2800)
+  }, [])
+
+  const dismissToast = useCallback(() => {
+    if (toastTimerRef.current != null) window.clearTimeout(toastTimerRef.current)
+    setToast(null)
+  }, [])
 
   const queueIndexRef = useRef(0)
   const analyserRef = useRef<AnalyserHandle>({ freq: null, level: 0, isAudio: false, channel: null })
@@ -214,8 +230,19 @@ export function PrototypeProvider({ children }: { children: ReactNode }) {
   const toggleLike = useCallback((trackId?: string) => {
     const id = trackId ?? currentTrack?.id
     if (!id) return
-    setLiked(prev => ({ ...prev, [id]: !prev[id] }))
-  }, [currentTrack])
+    setLiked(prev => {
+      const nextLiked = !prev[id]
+      const all = [...mockTracks, ...upcoming.map(u => u.track)]
+      const t = all.find(x => x.id === id) ?? currentTrack
+      const moodLabel = currentMoodId
+      const mood = mockMoods.find(m => m.id === moodLabel)
+      if (t) {
+        if (nextLiked) showToast(`已记入「${mood?.label ?? moodLabel}」`, `${t.title} · ${t.artist}`)
+        else showToast(`从「${mood?.label ?? moodLabel}」移除`, `${t.title} · ${t.artist}`)
+      }
+      return { ...prev, [id]: nextLiked }
+    })
+  }, [currentTrack, currentMoodId, upcoming, showToast])
 
   const setVolume = useCallback((v: number) => {
     setVolumeState(Math.max(0, Math.min(1, v)))
@@ -324,6 +351,8 @@ export function PrototypeProvider({ children }: { children: ReactNode }) {
     currentMood: moods.find(m => m.id === currentMoodId) ?? moods[0],
     setMood,
     upcoming,
+    toast,
+    dismissToast,
     toggleTheme,
     toggleHideChat,
     togglePlay,
@@ -342,6 +371,7 @@ export function PrototypeProvider({ children }: { children: ReactNode }) {
     currentTrack, isPlaying, currentTime, duration, volume, liked,
     theme, hideChat, messages, activeDJId, djElapsedMs,
     profiles, tasteFiles, moods, currentMoodId, upcoming, setMood,
+    toast, dismissToast,
     toggleTheme, toggleHideChat, togglePlay, next, prev, stop, toggleLike,
     setVolume, seek, selectTrack, sendMessage, replayDJ, switchProfile, saveTasteFile,
   ])
