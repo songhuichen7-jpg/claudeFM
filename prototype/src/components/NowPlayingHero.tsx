@@ -34,13 +34,13 @@ export function NowPlayingHero({ onOpenFocus }: Props) {
   const era = currentTrack?.era ?? ""
 
   return (
-    <section className="relative flex flex-col items-center px-5 pb-4">
+    <section className="relative flex flex-col items-center px-3 pb-2 sm:px-5 sm:pb-4">
       {/* Artwork panel — square, dominant */}
       <button
         type="button"
         onClick={onOpenFocus}
         aria-label="Open focus view"
-        className="group relative aspect-square w-full max-w-[300px] overflow-hidden rounded-[24px] border border-white/10 light:border-black/10"
+        className="group relative aspect-square w-full max-w-[260px] sm:max-w-[280px] md:max-w-[300px] overflow-hidden rounded-[24px] border border-white/10 light:border-black/10"
         style={{
           background: `
             radial-gradient(ellipse at 30% 20%, ${currentMood.accent}55 0%, transparent 55%),
@@ -75,18 +75,18 @@ export function NowPlayingHero({ onOpenFocus }: Props) {
       </button>
 
       {/* Title */}
-      <div className="mt-5 w-full text-center">
-        <h2 className="font-serif text-[28px] leading-[1.05] text-white light:text-black/90">
+      <div className="mt-4 sm:mt-5 w-full text-center">
+        <h2 className="font-serif text-[24px] sm:text-[26px] md:text-[28px] leading-[1.05] text-white light:text-black/90">
           <span className="italic">{title}</span>
         </h2>
-        <p className="mt-1 font-mono text-[12px] tracking-[0.04em] text-white/55 light:text-black/55">
+        <p className="mt-1 font-mono text-[11.5px] sm:text-[12px] tracking-[0.04em] text-white/55 light:text-black/55">
           {artist}
           {era ? <span className="text-white/30 light:text-black/30">  ·  {era}</span> : null}
         </p>
       </div>
 
       {/* Progress */}
-      <div className="mt-4 flex w-full items-center gap-3">
+      <div className="mt-3 sm:mt-4 flex w-full items-center gap-3">
         <span className="font-pixel text-[10px] tracking-[0.18em] text-white/55 tabular-nums light:text-black/55">
           {fmt(currentTime)}
         </span>
@@ -97,7 +97,7 @@ export function NowPlayingHero({ onOpenFocus }: Props) {
       </div>
 
       {/* Controls — Like, Prev, big Play, Next, More */}
-      <div className="mt-4 flex items-center justify-center gap-6">
+      <div className="mt-3 sm:mt-4 flex items-center justify-center gap-4 sm:gap-6">
         <IconBtn
           label="Like"
           onClick={() => toggleLike()}
@@ -112,9 +112,10 @@ export function NowPlayingHero({ onOpenFocus }: Props) {
           type="button"
           onClick={togglePlay}
           aria-label={isPlaying ? "Pause" : "Play"}
-          className="grid h-14 w-14 place-items-center rounded-full bg-white text-black transition-transform hover:scale-[1.04] active:scale-[0.96] light:bg-black light:text-white"
+          className="grid h-12 w-12 sm:h-14 sm:w-14 place-items-center rounded-full bg-white text-black transition-transform hover:scale-[1.04] active:scale-[0.96] light:bg-black light:text-white"
         >
-          {isPlaying ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" className="translate-x-0.5" />}
+          {isPlaying ? <Pause size={20} fill="currentColor" className="sm:hidden" /> : <Play size={20} fill="currentColor" className="translate-x-0.5 sm:hidden" />}
+          {isPlaying ? <Pause size={22} fill="currentColor" className="hidden sm:block" /> : <Play size={22} fill="currentColor" className="hidden sm:block translate-x-0.5" />}
         </button>
         <IconBtn label="Next" onClick={next}>
           <SkipForward size={22} fill="currentColor" />

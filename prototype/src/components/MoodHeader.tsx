@@ -53,7 +53,7 @@ export function MoodHeader({ onOpenProfile, onOpenSettings }: Props) {
               onClick={() => setPickerOpen(false)}
               className="fixed inset-0 z-20 cursor-default"
             />
-            <div className="absolute left-1/2 top-full z-30 mt-2 w-[240px] -translate-x-1/2 overflow-hidden rounded-2xl border border-white/10 bg-[#0d0c12]/95 backdrop-blur-xl shadow-[0_30px_60px_-20px_rgba(0,0,0,0.7)]">
+            <div className="absolute left-1/2 top-full z-30 mt-2 w-[240px] -translate-x-1/2 overflow-hidden rounded-2xl border border-white/10 bg-[#0d0c12]/95 backdrop-blur-xl shadow-[0_30px_60px_-20px_rgba(0,0,0,0.7)] light:border-black/10 light:bg-[#fbf8f0]/95">
               {moods.map(m => {
                 const active = m.id === currentMood.id
                 return (
@@ -66,15 +66,17 @@ export function MoodHeader({ onOpenProfile, onOpenSettings }: Props) {
                     }}
                     className={clsx(
                       "flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left transition-colors",
-                      active ? "bg-white/[0.08]" : "hover:bg-white/[0.04]",
+                      active
+                        ? "bg-white/[0.08] light:bg-black/[0.06]"
+                        : "hover:bg-white/[0.04] light:hover:bg-black/[0.04]",
                     )}
                   >
                     <span className="text-[18px] leading-none">{m.emoji}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="font-pixel text-[12px] tracking-[0.14em] text-white">
+                      <div className="font-pixel text-[12px] tracking-[0.14em] text-white light:text-black/90">
                         {m.label}
                       </div>
-                      <div className="font-mono text-[10px] text-white/45 truncate">{m.tagline}</div>
+                      <div className="font-mono text-[10px] text-white/45 truncate light:text-black/55">{m.tagline}</div>
                     </div>
                     {active && (
                       <span className="h-1.5 w-1.5 rounded-full" style={{ background: m.accent }} />

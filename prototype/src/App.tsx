@@ -5,17 +5,19 @@ import { MoodHeader } from "./components/MoodHeader"
 import { NowPlayingHero } from "./components/NowPlayingHero"
 import { DJCaption } from "./components/DJCaption"
 import { QuickChips } from "./components/QuickChips"
-import { SidePanel, type SidePanelTab } from "./components/SidePanel"
+import { SidePanel, SidePanelMobile, type SidePanelTab } from "./components/SidePanel"
 import { Toast } from "./components/Toast"
 import { ProfileCard } from "./components/ProfileCard"
 import { FocusView } from "./components/FocusView"
 import { SettingsView } from "./components/SettingsView"
+import { useIsCompact } from "./hooks"
 
 function Body() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [focusOpen, setFocusOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [sideTab, setSideTab] = useState<SidePanelTab>("chat")
+  const compact = useIsCompact()
 
   return (
     <Shell>
@@ -24,15 +26,16 @@ function Body() {
         onOpenSettings={() => setSettingsOpen(true)}
       />
       <main className="relative flex flex-1 overflow-hidden">
-        <section className="flex flex-1 flex-col items-center justify-center px-8 pb-4">
+        <section className="flex flex-1 flex-col items-center justify-center px-4 pb-3 sm:px-8 sm:pb-4">
           <div className="flex w-full max-w-[460px] flex-col">
             <NowPlayingHero onOpenFocus={() => setFocusOpen(true)} />
             <DJCaption onOpenChat={() => setSideTab("chat")} />
             <QuickChips />
           </div>
         </section>
-        <SidePanel tab={sideTab} setTab={setSideTab} />
+        {!compact && <SidePanel tab={sideTab} setTab={setSideTab} />}
       </main>
+      {compact && <SidePanelMobile tab={sideTab} setTab={setSideTab} />}
 
       <Toast />
       <ProfileCard open={profileOpen} onClose={() => setProfileOpen(false)} />

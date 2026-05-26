@@ -33,6 +33,22 @@ export function SidePanel({ tab, setTab }: Props) {
 
   return (
     <aside className="relative flex w-[400px] shrink-0 flex-col border-l border-white/8 light:border-black/10">
+      <SidePanelInner tab={tab} setTab={setTab} chatBadge={chatBadge} />
+    </aside>
+  )
+}
+
+export function SidePanelInner({
+  tab,
+  setTab,
+  chatBadge,
+}: {
+  tab: SidePanelTab
+  setTab: (t: SidePanelTab) => void
+  chatBadge: boolean
+}) {
+  return (
+    <>
       <div className="flex items-center gap-1 px-3 pt-3 pb-2">
         <TabBtn active={tab === "chat"} onClick={() => setTab("chat")} badge={chatBadge && tab !== "chat"}>
           Chat
@@ -56,7 +72,110 @@ export function SidePanel({ tab, setTab }: Props) {
           <InputBar />
         </div>
       )}
-    </aside>
+    </>
+  )
+}
+
+/**
+ * Mobile presentation of the side panel: a small status row docked at the
+ * bottom (counts + last DJ caption + 3 tab chips). Tapping the row or any
+ * chip opens a slide-up sheet hosting the same SidePanelInner.
+ */
+export function SidePanelMobile({
+  tab,
+  setTab,
+}: {
+  tab: SidePanelTab
+  setTab: (t: SidePanelTab) => void
+}) {
+  const { messages } = usePrototype()
+  const lastMsgIdRef = useRef<string | null>(null)
+  const [open, setOpen] = useState(false)
+  const [chatBadge, setChatBadge] = useState(false)
+
+  useEffect(() => {
+    const last = messages[messages.length - 1]
+    if (!last) return
+    if (lastMsgIdRef.current === last.id) return
+    lastMsgIdRef.current = last.id
+    if (last.kind === "dj" && (!open || tab !== "chat")) setChatBadge(true)
+  }, [messages, open, tab])
+  useEffect(() => {
+    if (open && tab === "chat") setChatBadge(false)
+  }, [open, tab])
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [open])
+
+  const openTo = (t: SidePanelTab) => {
+    setTab(t)
+    setOpen(true)
+  }
+
+  return (
+    <>
+      <nav className="flex items-center gap-1 border-t border-white/8 bg-black/30 px-2 py-2 light:border-black/10 light:bg-white/40">
+        <PillBtn onClick={() => openTo("chat")} badge={chatBadge}>
+          Chat
+        </PillBtn>
+        <PillBtn onClick={() => openTo("queue")}>Up Next</PillBtn>
+        <PillBtn onClick={() => openTo("library")}>Library</PillBtn>
+        <span aria-hidden className="ml-auto font-pixel text-[9.5px] tracking-[0.24em] text-white/35 light:text-black/40">
+          PULL UP
+        </span>
+      </nav>
+
+      {open && (
+        <div className="fixed inset-0 z-40 flex" role="dialog" aria-modal="true">
+          <button
+            type="button"
+            aria-label="Close panel backdrop"
+            onClick={() => setOpen(false)}
+            className="absolute inset-0 bg-black/45 backdrop-blur-[4px] light:bg-black/30"
+          />
+          <div className="relative mt-[12vh] flex w-full flex-col overflow-hidden rounded-t-[28px] border-t border-x border-white/10 bg-[#0a090f]/95 backdrop-blur-2xl shadow-[0_-30px_60px_-20px_rgba(0,0,0,0.6)] light:border-black/10 light:bg-[#faf6ec]/95">
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label="Close panel"
+              className="mx-auto mt-2 grid h-6 w-12 place-items-center"
+            >
+              <span className="h-1 w-9 rounded-full bg-white/20 light:bg-black/20" />
+            </button>
+            <SidePanelInner tab={tab} setTab={setTab} chatBadge={chatBadge && tab !== "chat"} />
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+function PillBtn({
+  children,
+  onClick,
+  badge,
+}: {
+  children: React.ReactNode
+  onClick: () => void
+  badge?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="relative shrink-0 rounded-full border border-white/12 bg-white/[0.04] px-3 py-1.5 font-pixel text-[11px] tracking-[0.18em] text-white/85 transition-colors hover:bg-white/[0.08] active:scale-[0.97] light:border-black/12 light:bg-black/[0.04] light:text-black/85 light:hover:bg-black/[0.08]"
+    >
+      {children}
+      {badge && (
+        <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[#29ffb8] shadow-[0_0_6px_rgba(41,255,184,0.7)]" />
+      )}
+    </button>
   )
 }
 
@@ -167,7 +286,7 @@ function ChatRow({
   }
   return (
     <div className="my-2 flex gap-2 pr-2">
-      <div className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet-500/40 to-fuchsia-500/30 ring-1 ring-white/15">
+      <div className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet-500/40 to-fuchsia-500/30 ring-1 ring-white/15 light:ring-black/10">
         <span className="font-pixel text-[10px] text-white">C</span>
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -227,17 +346,17 @@ function TrackChip({ track, onPlay }: { track: Track; onPlay: () => void }) {
     <button
       type="button"
       onClick={onPlay}
-      className="group flex w-full items-center gap-2.5 rounded-lg border border-white/6 bg-black/30 px-2.5 py-1.5 text-left transition-colors hover:border-white/15 hover:bg-black/40"
+      className="group flex w-full items-center gap-2.5 rounded-lg border border-white/6 bg-black/30 px-2.5 py-1.5 text-left transition-colors hover:border-white/15 hover:bg-black/40 light:border-black/8 light:bg-white/50 light:hover:border-black/20 light:hover:bg-white/70"
     >
-      <PlayCircle size={20} className="shrink-0 text-white/70 transition-colors group-hover:text-[#29ffb8]" />
+      <PlayCircle size={20} className="shrink-0 text-white/70 transition-colors group-hover:text-[#29ffb8] light:text-black/65" />
       <div className="min-w-0 flex-1">
-        <div className="truncate font-serif text-[13.5px] leading-tight text-white/95">
+        <div className="truncate font-serif text-[13.5px] leading-tight text-white/95 light:text-black/90">
           <span className="italic">{track.title}</span>
           <span className="mx-1 text-white/30">·</span>
-          <span className="text-white/70">{track.artist}</span>
+          <span className="text-white/70 light:text-black/65">{track.artist}</span>
         </div>
         {track.era && (
-          <div className="font-pixel text-[9px] tracking-[0.22em] text-white/35">
+          <div className="font-pixel text-[9px] tracking-[0.22em] text-white/35 light:text-black/40">
             {track.era}
           </div>
         )}
@@ -254,22 +373,22 @@ function QueueTab() {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-4 pt-3 pb-2">
-        <h3 className="font-pixel text-[13px] tracking-[0.18em] text-white">Up Next</h3>
-        <span className="font-pixel text-[10px] tracking-[0.24em] text-white/40">
+        <h3 className="font-pixel text-[13px] tracking-[0.18em] text-white light:text-black/90">Up Next</h3>
+        <span className="font-pixel text-[10px] tracking-[0.24em] text-white/40 light:text-black/40">
           {upcoming.length} TRACKS
         </span>
       </div>
       <div className="thin-scroll flex-1 overflow-y-auto px-3 pb-3">
         {currentTrack && (
-          <div className="mb-3 rounded-xl border border-[#29ffb8]/30 bg-[#29ffb8]/[0.06] px-3 py-2">
+          <div className="mb-3 rounded-xl border border-[#29ffb8]/30 bg-[#29ffb8]/[0.06] px-3 py-2 light:border-[#0a8e6a]/30 light:bg-[#0a8e6a]/[0.08]">
             <div className="flex items-center gap-2">
-              <span className="font-pixel text-[9px] tracking-[0.24em] text-[#29ffb8]">NOW</span>
-              <Music size={11} className="text-[#29ffb8]" />
+              <span className="font-pixel text-[9px] tracking-[0.24em] text-[#29ffb8] dark:text-[#29ffb8] light:text-[#0a8e6a]">NOW</span>
+              <Music size={11} className="text-[#29ffb8] dark:text-[#29ffb8] light:text-[#0a8e6a]" />
             </div>
-            <div className="mt-1 truncate font-serif text-[14.5px] leading-tight text-white">
+            <div className="mt-1 truncate font-serif text-[14.5px] leading-tight text-white light:text-black/90">
               <span className="italic">{currentTrack.title}</span>
-              <span className="mx-1.5 text-white/30">·</span>
-              <span className="text-white/75">{currentTrack.artist}</span>
+              <span className="mx-1.5 text-white/30 light:text-black/30">·</span>
+              <span className="text-white/75 light:text-black/70">{currentTrack.artist}</span>
             </div>
           </div>
         )}
@@ -278,9 +397,9 @@ function QueueTab() {
           return (
             <div
               key={u.track.id + i}
-              className="group mb-1.5 flex items-start gap-2.5 rounded-xl border border-white/8 bg-white/[0.025] px-2.5 py-2"
+              className="group mb-1.5 flex items-start gap-2.5 rounded-xl border border-white/8 bg-white/[0.025] px-2.5 py-2 light:border-black/8 light:bg-white/50"
             >
-              <span className="mt-0.5 font-pixel text-[9.5px] tracking-[0.22em] text-white/40">
+              <span className="mt-0.5 font-pixel text-[9.5px] tracking-[0.22em] text-white/40 light:text-black/40">
                 {String(i + 1).padStart(2, "0")}
               </span>
               <button
@@ -288,12 +407,12 @@ function QueueTab() {
                 onClick={() => selectTrack(u.track)}
                 className="flex-1 min-w-0 text-left"
               >
-                <div className="truncate font-serif text-[14px] leading-tight text-white">
+                <div className="truncate font-serif text-[14px] leading-tight text-white light:text-black/90">
                   <span className="italic">{u.track.title}</span>
-                  <span className="mx-1.5 text-white/30">·</span>
-                  <span className="text-white/70">{u.track.artist}</span>
+                  <span className="mx-1.5 text-white/30 light:text-black/30">·</span>
+                  <span className="text-white/70 light:text-black/65">{u.track.artist}</span>
                 </div>
-                <div className="line-clamp-1 font-mono text-[10.5px] text-white/45">
+                <div className="line-clamp-1 font-mono text-[10.5px] text-white/45 light:text-black/50">
                   "{u.caption}"
                 </div>
               </button>
@@ -303,15 +422,15 @@ function QueueTab() {
                   onClick={() => toggleLike(u.track.id)}
                   aria-label="Like"
                   className={clsx(
-                    "grid h-6 w-6 place-items-center rounded-full transition-colors hover:bg-white/8",
-                    isLiked ? "text-pink-400" : "text-white/40 hover:text-white/75",
+                    "grid h-6 w-6 place-items-center rounded-full transition-colors hover:bg-white/8 light:hover:bg-black/8",
+                    isLiked ? "text-pink-400" : "text-white/40 hover:text-white/75 light:text-black/40 light:hover:text-black/75",
                   )}
                 >
                   <Heart size={11} fill={isLiked ? "currentColor" : "none"} />
                 </button>
                 <button
                   type="button"
-                  className="grid h-6 w-6 place-items-center rounded-full text-white/30 transition-colors hover:bg-white/8 hover:text-white/75"
+                  className="grid h-6 w-6 place-items-center rounded-full text-white/30 transition-colors hover:bg-white/8 hover:text-white/75 light:text-black/30 light:hover:bg-black/8 light:hover:text-black/75"
                   aria-label="Remove"
                 >
                   <X size={11} />

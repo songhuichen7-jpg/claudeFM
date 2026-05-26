@@ -13,8 +13,8 @@ export function LibraryTab() {
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-4 pt-3 pb-2">
         <div>
-          <h3 className="font-pixel text-[13px] tracking-[0.18em] text-white">Library</h3>
-          <p className="font-mono text-[10.5px] text-white/45">
+          <h3 className="font-pixel text-[13px] tracking-[0.18em] text-white light:text-black/90">Library</h3>
+          <p className="font-mono text-[10.5px] text-white/45 light:text-black/50">
             {likedTracks.length} liked · 来自所有 mood
           </p>
         </div>
@@ -36,13 +36,13 @@ export function LibraryTab() {
       <div className="thin-scroll flex-1 overflow-y-auto px-3 pb-3">
         {likedTracks.length === 0 ? (
           <div className="mt-12 text-center">
-            <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-white/8 bg-white/[0.02]">
-              <Heart size={20} className="text-white/30" />
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-white/8 bg-white/[0.02] light:border-black/10 light:bg-black/[0.02]">
+              <Heart size={20} className="text-white/30 light:text-black/30" />
             </div>
-            <p className="mt-3 font-serif text-[14px] text-white/55">
+            <p className="mt-3 font-serif text-[14px] text-white/55 light:text-black/55">
               还没有 ♥ 过任何歌
             </p>
-            <p className="mt-1 font-mono text-[11px] text-white/35">
+            <p className="mt-1 font-mono text-[11px] text-white/35 light:text-black/40">
               Claudio 会从你 ♥ 的曲目里学你的口味
             </p>
           </div>
@@ -55,26 +55,26 @@ export function LibraryTab() {
                 className={clsx(
                   "group mb-1 flex items-center gap-2.5 rounded-xl border px-2.5 py-2 transition-colors",
                   isNow
-                    ? "border-[#29ffb8]/30 bg-[#29ffb8]/[0.06]"
-                    : "border-white/6 bg-white/[0.025] hover:border-white/15 hover:bg-white/[0.05]",
+                    ? "border-[#29ffb8]/30 bg-[#29ffb8]/[0.06] light:border-[#0a8e6a]/30 light:bg-[#0a8e6a]/[0.08]"
+                    : "border-white/6 bg-white/[0.025] hover:border-white/15 hover:bg-white/[0.05] light:border-black/8 light:bg-white/50 light:hover:border-black/20 light:hover:bg-white/70",
                 )}
               >
                 <button
                   type="button"
                   onClick={() => selectTrack(t)}
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-black/40 text-white/70 transition-colors hover:bg-black/60 hover:text-[#29ffb8]"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-black/40 text-white/70 transition-colors hover:bg-black/60 hover:text-[#29ffb8] light:bg-black/15 light:text-black/60 light:hover:bg-black/25 light:hover:text-[#0a8e6a]"
                   aria-label="Play"
                 >
                   <PlayCircle size={18} />
                 </button>
                 <div className="flex-1 min-w-0">
-                  <div className="truncate font-serif text-[14.5px] leading-tight text-white">
+                  <div className="truncate font-serif text-[14.5px] leading-tight text-white light:text-black/90">
                     <span className="italic">{t.title}</span>
-                    <span className="mx-1.5 text-white/30">·</span>
-                    <span className="text-white/70">{t.artist}</span>
+                    <span className="mx-1.5 text-white/30 light:text-black/30">·</span>
+                    <span className="text-white/70 light:text-black/65">{t.artist}</span>
                   </div>
                   {t.era && (
-                    <div className="truncate font-pixel text-[9.5px] tracking-[0.18em] text-white/35">
+                    <div className="truncate font-pixel text-[9.5px] tracking-[0.18em] text-white/35 light:text-black/45">
                       {t.era}
                       {t.album ? ` · ${t.album}` : ""}
                     </div>
@@ -84,7 +84,7 @@ export function LibraryTab() {
                   type="button"
                   onClick={() => toggleLike(t.id)}
                   aria-label="Unlike"
-                  className="grid h-8 w-8 place-items-center rounded-full text-pink-400 transition-colors hover:bg-white/8"
+                  className="grid h-8 w-8 place-items-center rounded-full text-pink-400 transition-colors hover:bg-white/8 light:hover:bg-black/8"
                 >
                   <Heart size={15} fill="currentColor" />
                 </button>
