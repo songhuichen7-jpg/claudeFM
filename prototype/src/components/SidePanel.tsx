@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { clsx } from "clsx"
-import { Play, PlayCircle, X, Heart, Music } from "lucide-react"
+import { Heart, ListMusic, MessageSquareText, Music, Play, PlayCircle, X } from "lucide-react"
 import { usePrototype } from "../PrototypeContext"
 import type { ChatMessage, DJMessage, Track } from "../types"
 import { InputBar } from "./InputBar"
@@ -120,15 +120,26 @@ export function SidePanelMobile({
 
   return (
     <>
-      <nav className="flex items-center gap-1 border-t border-white/8 bg-black/30 px-2 py-2 light:border-black/10 light:bg-white/40">
-        <PillBtn onClick={() => openTo("chat")} badge={chatBadge}>
-          Chat
-        </PillBtn>
-        <PillBtn onClick={() => openTo("queue")}>Up Next</PillBtn>
-        <PillBtn onClick={() => openTo("library")}>Library</PillBtn>
-        <span aria-hidden className="ml-auto font-pixel text-[9.5px] tracking-[0.24em] text-white/35 light:text-black/40">
-          PULL UP
-        </span>
+      <nav
+        className="flex items-stretch border-t border-white/10 bg-black/55 px-2 pt-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] backdrop-blur-xl light:border-black/12 light:bg-white/65"
+        aria-label="Switch panel"
+      >
+        <TabBarBtn
+          icon={<MessageSquareText size={19} />}
+          label="Chat"
+          onClick={() => openTo("chat")}
+          badge={chatBadge}
+        />
+        <TabBarBtn
+          icon={<ListMusic size={19} />}
+          label="Up Next"
+          onClick={() => openTo("queue")}
+        />
+        <TabBarBtn
+          icon={<Heart size={18} />}
+          label="Library"
+          onClick={() => openTo("library")}
+        />
       </nav>
 
       {open && (
@@ -156,12 +167,14 @@ export function SidePanelMobile({
   )
 }
 
-function PillBtn({
-  children,
+function TabBarBtn({
+  icon,
+  label,
   onClick,
   badge,
 }: {
-  children: React.ReactNode
+  icon: React.ReactNode
+  label: string
   onClick: () => void
   badge?: boolean
 }) {
@@ -169,12 +182,17 @@ function PillBtn({
     <button
       type="button"
       onClick={onClick}
-      className="relative shrink-0 rounded-full border border-white/12 bg-white/[0.04] px-3 py-1.5 font-pixel text-[11px] tracking-[0.18em] text-white/85 transition-colors hover:bg-white/[0.08] active:scale-[0.97] light:border-black/12 light:bg-black/[0.04] light:text-black/85 light:hover:bg-black/[0.08]"
+      className="group relative flex flex-1 flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 transition-colors active:bg-white/[0.05] light:active:bg-black/[0.05]"
     >
-      {children}
-      {badge && (
-        <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[#29ffb8] shadow-[0_0_6px_rgba(41,255,184,0.7)]" />
-      )}
+      <span className="relative grid h-7 w-7 place-items-center text-white/55 transition-colors group-hover:text-white/90 light:text-black/55 light:group-hover:text-black/85">
+        {icon}
+        {badge && (
+          <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-[#29ffb8] shadow-[0_0_6px_rgba(41,255,184,0.7)]" />
+        )}
+      </span>
+      <span className="font-pixel text-[9.5px] tracking-[0.22em] text-white/55 group-hover:text-white/85 light:text-black/55 light:group-hover:text-black/85">
+        {label.toUpperCase()}
+      </span>
     </button>
   )
 }
