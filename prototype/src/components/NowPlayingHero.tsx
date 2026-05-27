@@ -40,38 +40,73 @@ export function NowPlayingHero({ onOpenFocus }: Props) {
         type="button"
         onClick={onOpenFocus}
         aria-label="Open focus view"
-        className="group relative aspect-square w-full max-w-[260px] sm:max-w-[280px] md:max-w-[300px] overflow-hidden rounded-[24px] border border-white/10 light:border-black/10"
-        style={{
-          background: `
-            radial-gradient(ellipse at 30% 20%, ${currentMood.accent}55 0%, transparent 55%),
-            radial-gradient(ellipse at 70% 80%, ${currentMood.accent}33 0%, transparent 60%),
-            #0a090f
-          `,
-        }}
+        className="group relative aspect-square w-full max-w-[260px] sm:max-w-[280px] md:max-w-[300px] overflow-hidden rounded-[24px] border border-white/10 bg-[#0a090f] light:border-black/10"
       >
-        <div className="dot-matrix pointer-events-none absolute inset-0 opacity-40" aria-hidden />
+        {currentTrack?.cover ? (
+          <img
+            src={currentTrack.cover}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+            loading="lazy"
+          />
+        ) : (
+          <>
+            <div
+              className="absolute inset-0"
+              style={{
+                background: `
+                  radial-gradient(ellipse at 30% 20%, ${currentMood.accent}55 0%, transparent 55%),
+                  radial-gradient(ellipse at 70% 80%, ${currentMood.accent}33 0%, transparent 60%),
+                  #0a090f
+                `,
+              }}
+            />
+            <div className="dot-matrix pointer-events-none absolute inset-0 opacity-40" aria-hidden />
+            <div className="absolute inset-x-6 top-1/2 -translate-y-1/2 text-white/85">
+              <WaveformBig playing={isPlaying} />
+            </div>
+          </>
+        )}
 
-        <div className="absolute left-3 top-3 flex items-center gap-1.5">
+        {/* Mood-tinted vignette + bottom darken for legibility of overlays */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: `
+              radial-gradient(ellipse at 30% 20%, ${currentMood.accent}33 0%, transparent 55%),
+              linear-gradient(to bottom, transparent 55%, rgba(0,0,0,0.55) 100%)
+            `,
+          }}
+        />
+
+        {/* ON AIR badge */}
+        <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-black/35 px-1.5 py-0.5 backdrop-blur-sm">
           <span className="live-dot inline-block h-1.5 w-1.5 rounded-full bg-[#29ffb8]" aria-hidden />
-          <span className="font-pixel text-[10px] tracking-[0.24em] text-[#29ffb8]">ON AIR</span>
+          <span className="font-pixel text-[9.5px] tracking-[0.24em] text-[#29ffb8]">ON AIR</span>
         </div>
         {era && (
-          <div className="absolute right-3 top-3 font-pixel text-[10px] tracking-[0.24em] text-white/60">
+          <div className="absolute right-3 top-3 rounded-full bg-black/35 px-2 py-0.5 font-pixel text-[9.5px] tracking-[0.24em] text-white/85 backdrop-blur-sm">
             {era.split("·")[0]?.trim()}
           </div>
         )}
 
-        {/* Big internal waveform */}
-        <div className="absolute inset-x-6 top-1/2 -translate-y-1/2 text-white/85">
-          <WaveformBig playing={isPlaying} />
-        </div>
-
-        <div className="absolute left-3 bottom-3 right-3 flex items-end justify-between">
-          <span className="font-pixel text-[10px] tracking-[0.24em] text-white/55">
-            CLAUDIO × {artist.toUpperCase()}
-          </span>
-          <span className="font-pixel text-[10px] tracking-[0.24em] text-white/55">FM</span>
-        </div>
+        {/* Slim live waveform across the bottom of the cover */}
+        {currentTrack?.cover ? (
+          <div
+            className="pointer-events-none absolute inset-x-3 bottom-3 opacity-90"
+            style={{ color: currentMood.accent }}
+          >
+            <WaveformBig playing={isPlaying} height={28} />
+          </div>
+        ) : (
+          <div className="absolute left-3 bottom-3 right-3 flex items-end justify-between">
+            <span className="font-pixel text-[10px] tracking-[0.24em] text-white/55">
+              CLAUDIO × {artist.toUpperCase()}
+            </span>
+            <span className="font-pixel text-[10px] tracking-[0.24em] text-white/55">FM</span>
+          </div>
+        )}
       </button>
 
       {/* Title */}

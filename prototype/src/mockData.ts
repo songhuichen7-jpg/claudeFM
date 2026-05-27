@@ -26,6 +26,15 @@ export const mockChips = [
   "讲讲这首歌",
 ]
 
+// Cover art is inlined as an SVG data URI here so the prototype works
+// without network access. In the real app these come from the NCM search
+// response: `song.album.picUrl` (see server/ncm.ts:42), optionally with
+// ?param=600y600 appended for a higher-res variant.
+const cov = (g1: string, g2: string, accent: string, accent2: string) => {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 600'><defs><linearGradient id='b' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='${g1}'/><stop offset='1' stop-color='${g2}'/></linearGradient><radialGradient id='g1' cx='28%' cy='22%' r='0.6'><stop offset='0' stop-color='${accent}' stop-opacity='0.8'/><stop offset='1' stop-color='${accent}' stop-opacity='0'/></radialGradient><radialGradient id='g2' cx='75%' cy='80%' r='0.5'><stop offset='0' stop-color='${accent2}' stop-opacity='0.7'/><stop offset='1' stop-color='${accent2}' stop-opacity='0'/></radialGradient></defs><rect width='600' height='600' fill='url(#b)'/><rect width='600' height='600' fill='url(#g1)'/><rect width='600' height='600' fill='url(#g2)'/><circle cx='180' cy='220' r='110' fill='${accent}' opacity='0.18'/><circle cx='430' cy='450' r='150' fill='${accent2}' opacity='0.16'/></svg>`
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+}
+
 export const mockTracks: Track[] = [
   {
     id: "t-plastic-love",
@@ -34,6 +43,7 @@ export const mockTracks: Track[] = [
     album: "Variety",
     duration: 285,
     era: "1984 · CITY POP",
+    cover: cov("#ff6ab8", "#3b1c4a", "#ffce5e", "#a06bff"),
   },
   {
     id: "t-says",
@@ -42,6 +52,7 @@ export const mockTracks: Track[] = [
     album: "Spaces",
     duration: 248,
     era: "2013 · NEO-CLASSICAL",
+    cover: cov("#3d5a80", "#0d1b2a", "#e0e1dd", "#7aa5d6"),
   },
   {
     id: "t-rufeng",
@@ -50,6 +61,7 @@ export const mockTracks: Track[] = [
     album: "迷",
     duration: 264,
     era: "1994 · 华语",
+    cover: cov("#c44a3c", "#2a0a14", "#ffb380", "#7c2532"),
   },
   {
     id: "t-lost-stars",
@@ -58,6 +70,7 @@ export const mockTracks: Track[] = [
     album: "Begin Again",
     duration: 244,
     era: "2014 · OST",
+    cover: cov("#4a2cb8", "#0c0a2b", "#9b8bf5", "#2bb8ad"),
   },
 ]
 
