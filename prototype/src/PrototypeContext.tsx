@@ -57,6 +57,7 @@ type State = {
   moods: Mood[]
   currentMood: Mood
   setMood: (id: string) => void
+  createMood: (label: string) => void
 
   upcoming: { track: Track; caption: string }[]
 
@@ -80,6 +81,19 @@ type State = {
 }
 
 const Ctx = createContext<State | null>(null)
+
+function pickEmoji(label: string): string {
+  const s = label.toLowerCase()
+  if (/(睡|晚|夜|night|sleep|床|被)/i.test(label)) return "🌙"
+  if (/(写|代码|code|email|邮件|工作|工位)/i.test(label)) return "⌨"
+  if (/(走|散步|跑|walk|run|地铁|路上)/i.test(label)) return "🚶"
+  if (/(雨|rain|下雨)/i.test(label)) return "🌧"
+  if (/(咖啡|coffee|早|morning|醒)/i.test(label)) return "☕"
+  if (/(做饭|吃饭|cook|dinner)/i.test(label)) return "🍳"
+  if (/(放空|发呆|想|empty|空)/i.test(label)) return "✦"
+  if (/(派对|party|爽|嗨)/i.test(label)) return "✺"
+  return s.length > 0 ? "◉" : "◉"
+}
 
 const DJ_RESPONSES = [
   "收到。我翻一翻今晚的牌堆。",
@@ -107,7 +121,7 @@ export function PrototypeProvider({ children }: { children: ReactNode }) {
 
   const [profiles] = useState<Profile[]>(mockProfiles)
   const [tasteFiles, setTasteFiles] = useState(mockTasteFiles)
-  const [moods] = useState<Mood[]>(mockMoods)
+  const [moods, setMoods] = useState<Mood[]>(mockMoods)
   const [currentMoodId, setCurrentMoodId] = useState<string>(() => {
     if (typeof window === "undefined") return mockMoods[0].id
     return window.localStorage.getItem("claudio-prototype-mood") ?? mockMoods[0].id
@@ -299,11 +313,7 @@ export function PrototypeProvider({ children }: { children: ReactNode }) {
     // Prototype: no-op; the active profile chip is purely visual.
   }, [])
 
-  const setMood = useCallback((id: string) => {
-    setCurrentMoodId(id)
-    if (typeof window !== "undefined") window.localStorage.setItem("claudio-prototype-mood", id)
-    const m = mockMoods.find(x => x.id === id)
-    if (!m) return
+  const announceMood = useCallback((m: Mood) => {
     const ts = new Date()
     const hhmm = `${String(ts.getHours()).padStart(2, "0")}:${String(ts.getMinutes()).padStart(2, "0")}`
     const text = `切到「${m.label}」。${m.tagline}。`
@@ -325,6 +335,34 @@ export function PrototypeProvider({ children }: { children: ReactNode }) {
     setActiveDJId(djId)
     setDjElapsedMs(0)
   }, [])
+
+  const setMood = useCallback((id: string) => {
+    setCurrentMoodId(id)
+    if (typeof window !== "undefined") window.localStorage.setItem("claudio-prototype-mood", id)
+    const m = moods.find(x => x.id === id)
+    if (m) announceMood(m)
+  }, [moods, announceMood])
+
+  /**
+   * Make a new Mood from a free-text label. Used by the picker when the
+   * user types something Claudio hasn't seen before. The accent cycles
+   * through a small palette; the emoji is picked by a tiny keyword
+   * heuristic; the tagline is just the label itself, since in production
+   * Claude would author a richer one from your taste.md.
+   */
+  const createMood = useCallback((label: string) => {
+    const trimmed = label.trim()
+    if (!trimmed) return
+    const palette = ["#b76cff", "#29ffb8", "#ff9b6b", "#6d4cff", "#ff6ab8", "#7aa5d6", "#ffce5e", "#9b8bf5"]
+    const accent = palette[(moods.length + 1) % palette.length]
+    const emoji = pickEmoji(trimmed)
+    const id = `m-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    const m: Mood = { id, label: trimmed, emoji, tagline: trimmed, accent }
+    setMoods(prev => [...prev, m])
+    setCurrentMoodId(id)
+    if (typeof window !== "undefined") window.localStorage.setItem("claudio-prototype-mood", id)
+    announceMood(m)
+  }, [moods.length, announceMood])
 
   const saveTasteFile = useCallback((name: string, body: string) => {
     setTasteFiles(prev => prev.map(f => (f.name === name ? { ...f, body } : f)))
@@ -350,6 +388,7 @@ export function PrototypeProvider({ children }: { children: ReactNode }) {
     moods,
     currentMood: moods.find(m => m.id === currentMoodId) ?? moods[0],
     setMood,
+    createMood,
     upcoming,
     toast,
     dismissToast,
@@ -370,7 +409,7 @@ export function PrototypeProvider({ children }: { children: ReactNode }) {
   }), [
     currentTrack, isPlaying, currentTime, duration, volume, liked,
     theme, hideChat, messages, activeDJId, djElapsedMs,
-    profiles, tasteFiles, moods, currentMoodId, upcoming, setMood,
+    profiles, tasteFiles, moods, currentMoodId, upcoming, setMood, createMood,
     toast, dismissToast,
     toggleTheme, toggleHideChat, togglePlay, next, prev, stop, toggleLike,
     setVolume, seek, selectTrack, sendMessage, replayDJ, switchProfile, saveTasteFile,

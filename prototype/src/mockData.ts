@@ -16,14 +16,48 @@ export const mockMoods: Mood[] = [
   { id: "sleep", label: "入睡", emoji: "🌃", tagline: "钢琴 + 雨", accent: "#6d4cff" },
 ]
 
-export const mockChips = [
+/**
+ * Contextual chip pools. Each entry is what Claudio "would suggest"
+ * given the currently playing track. In production these are generated
+ * by Claude looking at the live state; here we hand-author per-track.
+ */
+export const mockTrackChips: Record<string, string[]> = {
+  "t-plastic-love": [
+    "再多来几首 city pop",
+    "降一点 BPM",
+    "换个语言试试？",
+  ],
+  "t-says": [
+    "继续慢一点",
+    "想换成钢琴 + 雨？",
+    "再来一首 Nils",
+  ],
+  "t-rufeng": [
+    "继续 90s 华语",
+    "回到日文歌？",
+    "找首林忆莲",
+  ],
+  "t-lost-stars": [
+    "再多来几首电影歌",
+    "升一点情绪",
+    "讲讲这首歌的故事",
+  ],
+}
+
+/** Fallback chips when current track has no specific pool. */
+export const mockFallbackChips = [
   "再来一首",
   "换个心情",
-  "慢一点",
-  "猛一点",
-  "存进今晚",
-  "我现在在写代码",
   "讲讲这首歌",
+]
+
+/** Claudio's mood suggestions in the picker. */
+export const mockMoodSuggestions = [
+  "加班晚归 想放空",
+  "下雨夜 想被音乐接住",
+  "写邮件 但不想烦",
+  "醒来还赖在床上",
+  "做饭 一个人",
 ]
 
 // Cover art is inlined as an SVG data URI here so the prototype works

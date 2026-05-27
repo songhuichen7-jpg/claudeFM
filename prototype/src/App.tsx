@@ -2,7 +2,8 @@ import { useState } from "react"
 import { PrototypeProvider } from "./PrototypeContext"
 import { Shell } from "./components/Shell"
 import { MoodHeader } from "./components/MoodHeader"
-import { MoodTabs } from "./components/MoodTabs"
+import { MoodChip } from "./components/MoodChip"
+import { MoodPicker } from "./components/MoodPicker"
 import { NowPlayingHero } from "./components/NowPlayingHero"
 import { QuickChips } from "./components/QuickChips"
 import { Timeline } from "./components/Timeline"
@@ -16,6 +17,7 @@ function Body() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [focusOpen, setFocusOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [moodPickerOpen, setMoodPickerOpen] = useState(false)
 
   return (
     <Shell>
@@ -23,7 +25,10 @@ function Body() {
         onOpenProfile={() => setProfileOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
       />
-      <MoodTabs />
+
+      <div className="mx-auto flex w-full max-w-[640px] items-center justify-center px-4 pt-1 pb-3">
+        <MoodChip onOpen={() => setMoodPickerOpen(true)} />
+      </div>
 
       <main className="thin-scroll relative flex-1 overflow-y-auto pb-24">
         <div className="mx-auto w-full max-w-[640px]">
@@ -38,6 +43,7 @@ function Body() {
       <Composer />
 
       <Toast />
+      <MoodPicker open={moodPickerOpen} onClose={() => setMoodPickerOpen(false)} />
       <ProfileCard open={profileOpen} onClose={() => setProfileOpen(false)} />
       <FocusView open={focusOpen} onClose={() => setFocusOpen(false)} />
       <SettingsView open={settingsOpen} onClose={() => setSettingsOpen(false)} />
