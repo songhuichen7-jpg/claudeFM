@@ -170,3 +170,12 @@ html.light .shell-glow { box-shadow: var(--shell-glow-light); }
   0%, 100% { transform: scaleY(0.25); }
   50% { transform: scaleY(1); }
 }
+
+/* Slow vinyl rotation on the now-playing cover */
+@keyframes vinyl-rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.vinyl-spin {
+  animation: vinyl-rotate 32s linear infinite;
+}

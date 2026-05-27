@@ -34,21 +34,42 @@ export function NowPlayingHero({ onOpenFocus }: Props) {
   const era = currentTrack?.era ?? ""
 
   return (
-    <section className="relative flex flex-col items-center px-3 pb-2 sm:px-5 sm:pb-4">
+    <section className="relative flex flex-col items-center px-4 pt-3 pb-4">
       {/* Artwork panel — square, dominant */}
       <button
         type="button"
         onClick={onOpenFocus}
         aria-label="Open focus view"
-        className="group relative aspect-square w-full max-w-[260px] sm:max-w-[280px] md:max-w-[300px] overflow-hidden rounded-[24px] border border-white/10 bg-[#0a090f] light:border-black/10"
+        className="group relative aspect-square w-full max-w-[260px] sm:max-w-[280px] md:max-w-[300px] overflow-hidden rounded-full border border-white/10 bg-[#0a090f] light:border-black/10"
       >
         {currentTrack?.cover ? (
-          <img
-            src={currentTrack.cover}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
-            loading="lazy"
-          />
+          <>
+            <img
+              src={currentTrack.cover}
+              alt=""
+              className={clsx(
+                "absolute inset-0 h-full w-full object-cover transition-[transform,opacity] duration-500",
+                isPlaying && "vinyl-spin",
+              )}
+              loading="lazy"
+            />
+            {/* Vinyl center dot */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+              style={{
+                width: 36,
+                height: 36,
+                background: "rgba(0,0,0,0.85)",
+                boxShadow: `inset 0 0 0 1px ${currentMood.accent}55, 0 0 12px ${currentMood.accent}40`,
+              }}
+            >
+              <div
+                className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full"
+                style={{ background: currentMood.accent }}
+              />
+            </div>
+          </>
         ) : (
           <>
             <div
@@ -80,34 +101,33 @@ export function NowPlayingHero({ onOpenFocus }: Props) {
           }}
         />
 
-        {/* ON AIR badge */}
-        <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-black/35 px-1.5 py-0.5 backdrop-blur-sm">
-          <span className="live-dot inline-block h-1.5 w-1.5 rounded-full bg-[#29ffb8]" aria-hidden />
-          <span className="font-pixel text-[9.5px] tracking-[0.24em] text-[#29ffb8]">ON AIR</span>
-        </div>
-        {era && (
-          <div className="absolute right-3 top-3 rounded-full bg-black/35 px-2 py-0.5 font-pixel text-[9.5px] tracking-[0.24em] text-white/85 backdrop-blur-sm">
-            {era.split("·")[0]?.trim()}
-          </div>
-        )}
-
-        {/* Slim live waveform across the bottom of the cover */}
-        {currentTrack?.cover ? (
-          <div
-            className="pointer-events-none absolute inset-x-3 bottom-3 opacity-90"
-            style={{ color: currentMood.accent }}
-          >
-            <WaveformBig playing={isPlaying} height={28} />
-          </div>
-        ) : (
-          <div className="absolute left-3 bottom-3 right-3 flex items-end justify-between">
-            <span className="font-pixel text-[10px] tracking-[0.24em] text-white/55">
-              CLAUDIO × {artist.toUpperCase()}
-            </span>
-            <span className="font-pixel text-[10px] tracking-[0.24em] text-white/55">FM</span>
-          </div>
-        )}
       </button>
+
+      {/* Tonearm — anchored to top-right of the vinyl. Subtle pixel-y indicator
+          that something is "playing" without overlaying the cover itself. */}
+      {currentTrack?.cover && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute right-[calc(50%-150px)] top-2 hidden md:block"
+        >
+          <div
+            className="h-20 w-px origin-top rotate-[28deg]"
+            style={{
+              background: `linear-gradient(to bottom, transparent, ${currentMood.accent}aa)`,
+              opacity: isPlaying ? 1 : 0.35,
+              transition: "opacity 400ms",
+            }}
+          />
+          <div
+            className="absolute -right-1 -top-1 h-2 w-2 rounded-full"
+            style={{
+              background: currentMood.accent,
+              boxShadow: `0 0 8px ${currentMood.accent}aa`,
+              opacity: isPlaying ? 1 : 0.4,
+            }}
+          />
+        </div>
+      )}
 
       {/* Title */}
       <div className="mt-4 sm:mt-5 w-full text-center">
@@ -147,10 +167,17 @@ export function NowPlayingHero({ onOpenFocus }: Props) {
           type="button"
           onClick={togglePlay}
           aria-label={isPlaying ? "Pause" : "Play"}
-          className="grid h-12 w-12 sm:h-14 sm:w-14 place-items-center rounded-full bg-white text-black transition-transform hover:scale-[1.04] active:scale-[0.96] light:bg-black light:text-white"
+          className="grid h-12 w-12 place-items-center rounded-full text-black transition-transform hover:scale-[1.04] active:scale-[0.96] sm:h-14 sm:w-14"
+          style={{
+            background: currentMood.accent,
+            boxShadow: `0 8px 24px -6px ${currentMood.accent}88, 0 0 0 1px ${currentMood.accent}33`,
+          }}
         >
-          {isPlaying ? <Pause size={20} fill="currentColor" className="sm:hidden" /> : <Play size={20} fill="currentColor" className="translate-x-0.5 sm:hidden" />}
-          {isPlaying ? <Pause size={22} fill="currentColor" className="hidden sm:block" /> : <Play size={22} fill="currentColor" className="hidden sm:block translate-x-0.5" />}
+          {isPlaying ? (
+            <Pause size={22} fill="currentColor" />
+          ) : (
+            <Play size={22} fill="currentColor" className="translate-x-0.5" />
+          )}
         </button>
         <IconBtn label="Next" onClick={next}>
           <SkipForward size={22} fill="currentColor" />
