@@ -1,9 +1,15 @@
 // Text preprocessor for Claudio's TTS pipeline.
-// Goal: Chinese/English mixed DJ commentary that reads like a late-night
-// radio host — natural breath, English names "bracketed" with soft pauses,
-// long sentences segmented, transitions marked with em-dashes.
+// Goal: Chinese/English mixed DJ commentary that reads like a young woman
+// whispering close to your ear — natural breath, English names "bracketed"
+// with soft pauses, long sentences segmented, transitions marked.
+//
+// Style modes:
+//   - "natural" — em-dashes / commas only. Works on every TTS engine.
+//   - "ssml"    — <break time=".."/> markers. For engines that parse SSML.
+//   - "mimo"    — MiMo's native audio tags ([吸气]/[气声]/[轻笑]) injected at
+//                 natural breath points. Maps Claudio's "e-girl breathy" feel.
 
-type Style = "natural" | "ssml"
+type Style = "natural" | "ssml" | "mimo"
 
 const ZH = /[一-鿿]/
 const DIGITS = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"] as const
@@ -30,10 +36,11 @@ export function preprocessForTts(input: string, style: Style = "natural"): strin
     .replace(/([A-Za-z0-9])([一-鿿])/g, "$1 $2")
 
   // 3. CJK-English-CJK sandwich → bracket the English token with breath commas.
-  //    "介绍 Coldplay 的 Yellow" → "介绍，Coldplay，的 Yellow".
-  //    Only tokens ≥ 3 chars qualify, so "OK / FM / DJ" stay fluid.
+  //    Only tokens ≥ 6 chars qualify ("Coldplay" / "Radiohead" / "honestly").
+  //    Short tokens (Yellow / OK / FM / DJ / Mia / song) stay fluid — bracketing
+  //    them every time makes the TTS stagger instead of speak.
   t = t.replace(
-    /([一-鿿])\s+([A-Za-z][A-Za-z0-9 '’\-]{2,}?)\s+([一-鿿])/g,
+    /([一-鿿])\s+([A-Za-z][A-Za-z0-9 '’\-]{5,}?)\s+([一-鿿])/g,
     (_m, a: string, eng: string, b: string) => `${a}，${eng.trim()}，${b}`,
   )
 
@@ -52,6 +59,18 @@ export function preprocessForTts(input: string, style: Style = "natural"): strin
       .replace(/——/g, '<break time="350ms"/>')
       .replace(/。/g, '。<break time="500ms"/>')
       .replace(/，/g, '，<break time="180ms"/>')}</speak>`
+  }
+
+  if (style === "mimo") {
+    // MiMo's "voice quality" is controlled by the style instruction in
+    // messages[0], NOT by sprinkling tags everywhere. Over-tagging makes the
+    // engine perform every breath instead of just speaking softly.
+    //
+    // So this branch deliberately injects almost nothing — em-dashes stay as
+    // em-dashes (MiMo handles them as natural pauses), no [气声] prefix.
+    // Tags only appear when the input text itself contains them (e.g. the
+    // assistant explicitly wrote "[轻笑]那这首" for a beat-level cue).
+    return t
   }
   return t
 }

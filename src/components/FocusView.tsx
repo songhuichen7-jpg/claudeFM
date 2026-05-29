@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from "react"
 import { ChevronDown, Pause, Play } from "lucide-react"
 import { usePlayer } from "../state/PlayerContext"
 import type { DJMessage, DJSegment, WordToken } from "../data/types"
-import { WaveformBig } from "./Waveform"
+import { Waveform } from "./Waveform"
 import { CatAvatar } from "./CatAvatar"
 
 function fmt(s: number) {
@@ -24,13 +24,13 @@ type Props = { open: boolean; onClose: () => void }
 export function FocusView({ open, onClose }: Props) {
   const {
     currentTrack,
-    currentTime,
     duration,
-    isPlaying,
-    togglePlay,
     messages,
     activeDJId,
     djElapsedMs,
+    isTtsPlaying,
+    ttsElapsedSec,
+    toggleTtsPlay,
   } = usePlayer()
   const totalSec = currentTrack?.duration ?? duration ?? 0
   const transcriptRef = useRef<HTMLDivElement>(null)
@@ -70,6 +70,7 @@ export function FocusView({ open, onClose }: Props) {
   if (!open) return null
 
   const isLive = activeDJId === headline?.id
+  const ttsTimer = fmt(ttsElapsedSec)
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-black text-white">
@@ -78,14 +79,19 @@ export function FocusView({ open, onClose }: Props) {
           <CatAvatar size={26} className="ring-1 ring-white/15" />
           <span className="font-pixel text-[22px] tracking-[0.02em]">Claudio</span>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="grid h-9 w-9 place-items-center rounded-full bg-white/5 text-white/75 transition-colors hover:bg-white/10 hover:text-white"
-          aria-label="Close focus view"
-        >
-          <ChevronDown size={18} />
-        </button>
+        <div className="flex items-center gap-3">
+          <span className="font-pixel text-[11px] tabular-nums text-white/65">
+            {ttsTimer}
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-9 w-9 place-items-center rounded-full bg-white/5 text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+            aria-label="Close focus view"
+          >
+            <ChevronDown size={18} />
+          </button>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 px-5 pb-3">
@@ -93,41 +99,24 @@ export function FocusView({ open, onClose }: Props) {
         <span className="font-pixel text-[11px] tracking-[0.22em] text-[#29ffb8]">
           {isLive ? "Speaking..." : "ON AIR"}
         </span>
-        <span className="ml-auto font-pixel text-[11px] tabular-nums text-white/55">
-          {fmt(currentTime)}
-        </span>
       </div>
 
-      <div className="px-6 text-white/85">
-        <WaveformBig playing={isPlaying} />
-      </div>
-
-      <div className="relative mx-4 mt-4 flex-1 overflow-hidden rounded-3xl bg-white text-black">
+      <div className="relative mx-4 mt-2 flex-1 overflow-hidden rounded-3xl bg-white text-black">
         <div className="absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-white to-white/0" />
         <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-white to-white/0" />
         <div className="absolute right-5 top-5 font-pixel text-[11px] tabular-nums text-black/45">
-          {fmt(currentTime)} / {fmt(totalSec)}
+          {fmt(totalSec)}
         </div>
-        <div className="px-6 pt-6 pb-3 font-serif">
+        <div className="px-6 pt-6 pb-2 font-serif">
           <h2 className="break-words text-[34px] leading-[1.05]">{segmentLabel}</h2>
           <p className="mt-1 font-mono text-[12px] tracking-[0.04em] text-black/55">
             <span className="italic">{trackTitle}</span>
             <span className="mx-1.5 text-black/30">—</span>
             <span>{trackArtist}</span>
           </p>
-          <div className="mt-4 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={togglePlay}
-              className="grid h-8 w-8 place-items-center rounded-full bg-black text-white"
-              aria-label={isPlaying ? "Pause" : "Play"}
-            >
-              {isPlaying ? <Pause size={13} /> : <Play size={13} />}
-            </button>
-            <div className="h-px flex-1 bg-black/15" />
-          </div>
+          <div className="mt-4 h-px w-full bg-black/12" />
         </div>
-        <div ref={transcriptRef} className="thin-scroll max-h-[42vh] space-y-4 overflow-y-auto px-6 pt-2 pb-8">
+        <div ref={transcriptRef} className="thin-scroll max-h-[42vh] space-y-4 overflow-y-auto px-6 pt-2 pb-10">
           {headline ? (
             headline.segments.length > 0 ? (
               headline.segments.map((seg, idx) => (
@@ -149,10 +138,30 @@ export function FocusView({ open, onClose }: Props) {
             )
           ) : (
             <p className="font-mono text-[12px] text-black/40">
-              （还没有 Claudio 的播报。先随便和他聊几句。）
+              （还没有 Claudio 的播报。先随便和她聊几句。）
             </p>
           )}
         </div>
+      </div>
+
+      {/* Bottom TTS control dock: elapsed time, equalizer waveform, round play/pause */}
+      <div className="mt-3 flex items-center gap-3 px-5">
+        <span className="font-pixel text-[12px] tabular-nums text-white/75 tracking-[0.05em]">
+          {ttsTimer}
+        </span>
+        <div className="relative flex-1 overflow-hidden">
+          <div className="flex h-[26px] items-center text-white/85">
+            <Waveform playing={isTtsPlaying} bars={26} height={22} />
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={toggleTtsPlay}
+          aria-label={isTtsPlaying ? "Pause speech" : "Play speech"}
+          className="grid h-10 w-10 place-items-center rounded-full bg-white/12 text-white/90 backdrop-blur-sm transition-colors hover:bg-white/20"
+        >
+          {isTtsPlaying ? <Pause size={16} /> : <Play size={16} />}
+        </button>
       </div>
 
       <div className="mt-3 flex items-center justify-between px-5 pb-5 font-pixel text-[10px] tracking-[0.32em] text-white/35">

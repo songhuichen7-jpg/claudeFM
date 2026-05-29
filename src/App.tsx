@@ -10,6 +10,7 @@ import { ProfileCard } from "./components/ProfileCard"
 import { FocusView } from "./components/FocusView"
 import { SettingsView } from "./components/SettingsView"
 import { LoginCard } from "./components/LoginCard"
+import { ScheduleView } from "./components/ScheduleView"
 
 function Body() {
   const { hideChat } = usePlayer()
@@ -17,6 +18,7 @@ function Body() {
   const [focusOpen, setFocusOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [loginOpen, setLoginOpen] = useState(false)
+  const [scheduleOpen, setScheduleOpen] = useState(false)
   // Bumped whenever LoginCard's NcmLoginPanel reports a status change so the
   // Header pill refreshes "LOGIN" → nickname (and vice versa on logout).
   const [loginRev, setLoginRev] = useState(0)
@@ -30,7 +32,10 @@ function Body() {
         loginRevision={loginRev}
       />
       <Clock onTap={() => setFocusOpen(true)} />
-      <Player onOpenFocus={() => setFocusOpen(true)} />
+      <Player
+        onOpenFocus={() => setFocusOpen(true)}
+        onOpenSchedule={() => setScheduleOpen(true)}
+      />
       {!hideChat && <ChatStream />}
       <div className="mt-auto">
         <InputBar />
@@ -42,6 +47,7 @@ function Body() {
         onOpenSettings={() => setSettingsOpen(true)}
       />
       <FocusView open={focusOpen} onClose={() => setFocusOpen(false)} />
+      <ScheduleView open={scheduleOpen} onClose={() => setScheduleOpen(false)} />
       <SettingsView open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <LoginCard
         open={loginOpen}

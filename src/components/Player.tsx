@@ -18,9 +18,9 @@ function fmt(s: number) {
   return `${m}:${String(r).padStart(2, "0")}`
 }
 
-type PlayerProps = { onOpenFocus?: () => void }
+type PlayerProps = { onOpenFocus?: () => void; onOpenSchedule?: () => void }
 
-export function Player({ onOpenFocus }: PlayerProps) {
+export function Player({ onOpenFocus, onOpenSchedule }: PlayerProps) {
   const {
     currentTrack,
     isPlaying,
@@ -28,7 +28,6 @@ export function Player({ onOpenFocus }: PlayerProps) {
     duration,
     volume,
     liked,
-    hideChat,
     favsMode,
     togglePlay,
     next,
@@ -37,7 +36,6 @@ export function Player({ onOpenFocus }: PlayerProps) {
     toggleLike,
     setVolume,
     seek,
-    toggleHideChat,
     toggleFavsMode,
   } = usePlayer()
 
@@ -85,10 +83,11 @@ export function Player({ onOpenFocus }: PlayerProps) {
           </IconBtn>
           <button
             type="button"
-            onClick={toggleHideChat}
+            onClick={onOpenSchedule}
+            title="今日电台时刻表"
             className="ml-1 rounded-md px-2 py-1 font-pixel text-[10px] tracking-[0.22em] text-white/55 hover:bg-white/5 hover:text-white/85 light:text-black/55 light:hover:bg-black/5 light:hover:text-black/80"
           >
-            {hideChat ? "SHOW" : "HIDE"}
+            LIST
           </button>
           <button
             type="button"

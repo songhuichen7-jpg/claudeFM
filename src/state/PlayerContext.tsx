@@ -60,6 +60,12 @@ type PlayerState = {
   activeDJId: string | null
   djElapsedMs: number
 
+  // TTS speech audio — exposed so FocusView can show a dedicated counter +
+  // play/pause button independent of the BGM controls.
+  isTtsPlaying: boolean
+  ttsElapsedSec: number
+  toggleTtsPlay: () => void
+
   // server status
   health: Health | null
   connected: boolean
@@ -120,6 +126,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [activeDJId, setActiveDJId] = useState<string | null>(null)
   const [djElapsedMs, setDjElapsedMs] = useState(0)
+  const [isTtsPlaying, setIsTtsPlaying] = useState(false)
+  const [ttsElapsedSec, setTtsElapsedSec] = useState(0)
 
   const [health, setHealth] = useState<Health | null>(null)
   const [connected, setConnected] = useState(false)
@@ -250,13 +258,27 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       }))
     }
     tts.addEventListener("loadedmetadata", ttsMeta)
-    tts.addEventListener("ended", () => setStatus(s => (s === "speaking" ? "playing" : s)))
+    const onTtsEnded = () => {
+      setStatus(s => (s === "speaking" ? "playing" : s))
+      setIsTtsPlaying(false)
+    }
+    const onTtsPlay = () => setIsTtsPlaying(true)
+    const onTtsPause = () => setIsTtsPlaying(false)
+    const onTtsTime = () => setTtsElapsedSec(tts.currentTime || 0)
+    tts.addEventListener("ended", onTtsEnded)
+    tts.addEventListener("play", onTtsPlay)
+    tts.addEventListener("pause", onTtsPause)
+    tts.addEventListener("timeupdate", onTtsTime)
 
     return () => {
       a.removeEventListener("timeupdate", onTime)
       a.removeEventListener("loadedmetadata", onDur)
       a.removeEventListener("ended", onEnded)
       tts.removeEventListener("loadedmetadata", ttsMeta)
+      tts.removeEventListener("ended", onTtsEnded)
+      tts.removeEventListener("play", onTtsPlay)
+      tts.removeEventListener("pause", onTtsPause)
+      tts.removeEventListener("timeupdate", onTtsTime)
       a.pause(); tts.pause(); prefetch.pause()
       duckingRef.current?.stop()
       duckingRef.current = null
@@ -634,6 +656,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (turn.segue) prefetchNext(turn.segue)
   }, [consumeAutoplayTicket, ensureAudioGraph, playTrack, prefetchNext])
 
+  const toggleTtsPlay = useCallback(() => {
+    const tts = ttsRef.current
+    if (!tts || !tts.src) return
+    ensureAudioGraph()
+    const ctx = audioCtxRef.current
+    if (ctx && ctx.state === "suspended") ctx.resume().catch(() => undefined)
+    if (tts.paused) tts.play().catch(() => undefined)
+    else tts.pause()
+  }, [ensureAudioGraph])
+
   const toggleTheme = useCallback(() => setTheme(t => (t === "dark" ? "light" : "dark")), [])
   const toggleHideChat = useCallback(() => setHideChat(v => !v), [])
   const toggleFavsMode = useCallback(() => setFavsMode(v => !v), [])
@@ -773,7 +805,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const trimmed = text.trim()
     if (!trimmed) return
     if (chatInFlightRef.current) {
-      addSystemMessage("Claudio 还在回上一句，等他说完再发。")
+      addSystemMessage("Claudio 还在回上一句，等她说完再发。")
       return
     }
     chatInFlightRef.current = true
@@ -893,6 +925,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     messages,
     activeDJId,
     djElapsedMs,
+    isTtsPlaying,
+    ttsElapsedSec,
+    toggleTtsPlay,
     health,
     connected,
     isAudioMaster,
@@ -922,6 +957,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }), [
     currentTrack, isPlaying, currentTime, duration, volume, liked,
     theme, hideChat, favsMode, status, messages, activeDJId, djElapsedMs,
+    isTtsPlaying, ttsElapsedSec, toggleTtsPlay,
     health, connected, profiles, isAudioMaster, claimAudioMaster,
     refreshProfiles, switchProfile, createProfile, refreshTaste, saveTasteFile,
     toggleTheme, toggleHideChat, toggleFavsMode, togglePlay, setPlaying, next, prev,

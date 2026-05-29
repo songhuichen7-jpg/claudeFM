@@ -29,6 +29,14 @@ state.db-shm
 state.db-wal
 cache/
 
+# Secrets
+.env
+.env.local
+.env.*.local
+
+# Extracted assets
+extracted_frames/
+
 # Personal profile data
 user/
 user.night/

@@ -93,7 +93,7 @@ export function ProfileCard({ open, onClose, onOpenSettings }: Props) {
         </div>
 
         <div className="relative mt-5 flex items-center justify-between gap-3 font-pixel text-[10px] tracking-[0.28em] text-white/35">
-          <span>CLAUDE × MMGUO</span>
+          <span>CLAUDIO × MMGUO</span>
           {onOpenSettings && (
             <button
               type="button"

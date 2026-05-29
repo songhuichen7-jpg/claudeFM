@@ -41,11 +41,11 @@ function pickPlaylistKey(hour: number, text?: string): string {
 }
 
 const SAY_TEMPLATES: Record<string, (track: { title: string; artist: string }) => string> = {
-  rainy_white: t => `下着雨的时候我习惯放 ${t.artist} 的 ${t.title}，让雨声跟琴声一起走。`,
-  "90s_chinese": t => `${t.artist} 的 ${t.title}。90 年代华语里我反复回头听的一首，慢慢来。`,
+  rainy_white: t => `下雨了。我给你放 ${t.artist} 的 ${t.title}，让雨声和琴声一起走，ok？`,
+  "90s_chinese": t => `${t.artist}，${t.title}。90 年代的歌，我反复回头听的那种，慢慢来。`,
   deep_focus: t => `${t.artist} 的 ${t.title}。节奏稳，不抢你的注意力，可以一直放着。`,
-  morning_glow: t => `早，给你一首 ${t.title} — ${t.artist}，让今天开机别太用力。`,
-  monday_night_exhale: t => `深夜了。给你一首 ${t.title} — ${t.artist}，让今天先慢慢落地。`,
+  morning_glow: t => `早安。给你一首 ${t.title}，${t.artist} 的。今天先别太用力，ok？`,
+  monday_night_exhale: t => `嗨，晚了。${t.title} — ${t.artist}，让今天慢慢落地吧。`,
 }
 
 export async function fallbackDJ(text: string): Promise<DJOutput> {
@@ -55,7 +55,7 @@ export async function fallbackDJ(text: string): Promise<DJOutput> {
   const playlist = playlists[key]
   if (!playlist || playlist.seeds.length === 0) {
     return {
-      say: "信号有点不稳，我先想想，等下回来。",
+      say: "嗯，信号有点不稳。我先想想，等下回来。",
       play: [],
       reason: "fallback: no playlist available",
       segue: "next time try claude again",

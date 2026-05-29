@@ -2,10 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "claudio-fm",
+      "name": "claudio-fm-web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["dev"],
-      "port": 5173
+      "runtimeArgs": ["exec", "vite", "--port", "5180", "--strictPort"],
+      "port": 5180
     }
   ]
 }

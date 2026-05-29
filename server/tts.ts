@@ -13,7 +13,7 @@ mkdirSync(CACHE_DIR, { recursive: true })
 // --- providers --------------------------------------------------------------
 
 const MIMO_KEY = process.env.MIMO_API_KEY
-const MIMO_VOICE = process.env.MIMO_VOICE ?? "苏打" // male Chinese — fits Claudio's late-night DJ
+const MIMO_VOICE = process.env.MIMO_VOICE ?? "冰糖" // young female Chinese — Claudio's default
 const MIMO_MODEL = process.env.MIMO_MODEL ?? "mimo-v2.5-tts"
 const MIMO_BASE = process.env.MIMO_BASE_URL ?? "https://api.xiaomimimo.com/v1"
 
@@ -27,7 +27,13 @@ const FISH_SPEED = Number(process.env.FISH_SPEED ?? 0.93)
 
 const DJ_STYLE_INSTRUCTION =
   process.env.MIMO_STYLE ??
-  "用自然、放松的语速念。中文按普通中文发音。英文单词、英文歌名、英文艺人名都按英文自然连读发音（不要逐个字母拼）。"
+  [
+    "二十出头的中文女孩，熟人之间随便聊两句的语气。",
+    "整体放松、自然、不用力。语速偏慢一点点，但是要连贯。",
+    "不要刻意做呼吸声，不要刻意做气声，不要句句叹气——像普通人轻声说话就好。",
+    "中文按普通中文发音；英文单词、英文歌名、英文艺人名按英语自然连读，不要逐字母拼。",
+    "句子里夹的英文小词（honestly、kinda、ok）按英语顺势念过去，不要切回中文腔。",
+  ].join("")
 
 /**
  * Normalise the say text before sending to MiMo TTS:
@@ -61,7 +67,7 @@ export async function synthesize(text: string): Promise<TtsResult> {
   const provider: "mimo" | "fish" | "silent" = MIMO_KEY ? "mimo" : FISH_KEY ? "fish" : "silent"
   const ext = provider === "silent" ? "mp3" : provider === "mimo" ? "wav" : "mp3"
   const speechText =
-    provider === "mimo" ? normaliseForTts(cleaned)
+    provider === "mimo" ? preprocessForTts(cleaned, "mimo")
     : provider === "fish" ? preprocessForTts(cleaned, "natural")
     : cleaned
 
