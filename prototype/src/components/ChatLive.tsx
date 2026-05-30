@@ -77,7 +77,7 @@ function Row({
     return (
       <div className="my-2 flex flex-col items-end">
         <span className="mb-1 font-mono text-[9px] tracking-[0.26em] text-white/35 light:text-black/40">
-          MMGUO · {msg.timestamp}
+          VEKO · {msg.timestamp}
         </span>
         <div className="max-w-[80%] rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 font-mono text-[13px] leading-relaxed text-white/85 light:border-black/10 light:bg-black/[0.03] light:text-black/85">
           {msg.text}

@@ -43,15 +43,18 @@
 /* Base */
 :root {
   color-scheme: dark;
+  /* Restrained rim-light around the device frame: a hairline top highlight,
+     a faint cool halo and one barely-there accent breath. No purple. */
   --shell-glow:
-    0 0 0 1px rgba(255, 255, 255, 0.06),
-    0 0 40px -8px rgba(124, 92, 255, 0.55),
-    0 0 120px -20px rgba(184, 108, 255, 0.45),
-    0 40px 80px -30px rgba(0, 0, 0, 0.8);
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 0 50px -16px rgba(52, 226, 155, 0.16),
+    0 30px 90px -40px rgba(0, 0, 0, 0.9);
   --shell-glow-light:
-    0 0 0 1px rgba(20, 19, 26, 0.08),
-    0 0 50px -10px rgba(124, 92, 255, 0.18),
-    0 30px 60px -25px rgba(50, 40, 80, 0.25);
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 0 0 1px rgba(20, 19, 26, 0.07),
+    0 0 50px -18px rgba(52, 226, 155, 0.12),
+    0 30px 70px -34px rgba(50, 50, 60, 0.25);
 }
 
 html, body, #root {

@@ -274,15 +274,25 @@ export function PrototypeProvider({ children }: { children: ReactNode }) {
     const ts = new Date()
     const hhmm = `${String(ts.getHours()).padStart(2, "0")}:${String(ts.getMinutes()).padStart(2, "0")}`
     const userId = `user-${ts.getTime()}`
-    setMessages(m => [...m, { id: userId, kind: "user", speaker: "mmguo", timestamp: hhmm, text: trimmed }])
-    // Fake DJ reply 700ms later
+    setMessages(m => [...m, { id: userId, kind: "user", speaker: "veko", timestamp: hhmm, text: trimmed }])
+
+    // Song-request path: if the message names a track we know (by title or
+    // artist), Claudio cues that exact song. In the real app this is the
+    // NCM search → resolve → play chain (server/ncm.ts: searchTrack).
+    const q = trimmed.toLowerCase()
+    const requested = mockTracks.find(t =>
+      q.includes(t.title.toLowerCase()) || q.includes(t.artist.toLowerCase()),
+    )
+
     window.setTimeout(() => {
       const stamp = new Date()
       const stampHHMM = `${String(stamp.getHours()).padStart(2, "0")}:${String(stamp.getMinutes()).padStart(2, "0")}`
-      const reply = DJ_RESPONSES[Math.floor(Math.random() * DJ_RESPONSES.length)]
-      const words = wordsFromText(reply)
       const id = `dj-${stamp.getTime()}`
-      const rec = mockTracks[Math.floor(Math.random() * mockTracks.length)]
+      const rec = requested ?? mockTracks[Math.floor(Math.random() * mockTracks.length)]
+      const reply = requested
+        ? `点歌收到 —— 这就给你放《${requested.title}》。`
+        : DJ_RESPONSES[Math.floor(Math.random() * DJ_RESPONSES.length)]
+      const words = wordsFromText(reply)
       setMessages(prev => [
         ...prev,
         {
@@ -299,8 +309,10 @@ export function PrototypeProvider({ children }: { children: ReactNode }) {
       ])
       setActiveDJId(id)
       setDjElapsedMs(0)
+      // A direct request actually starts playback; a vibe request just cues a card.
+      if (requested) advanceTo(requested)
     }, 700)
-  }, [])
+  }, [advanceTo])
 
   const replayDJ = useCallback((id: string) => {
     setActiveDJId(id)

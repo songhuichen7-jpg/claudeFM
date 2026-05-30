@@ -128,13 +128,13 @@ export const mockMessages: ChatMessage[] = [
   dj(
     "dj-1",
     "21:02",
-    "晚上好 mmguo，今天上海有点闷。先给你一首慢的，让肩膀松一下。",
+    "晚上好 veko，今天上海有点闷。先给你一首慢的，让肩膀松一下。",
     [mockTracks[1]],
   ),
   {
     id: "u-1",
     kind: "user",
-    speaker: "mmguo",
+    speaker: "veko",
     timestamp: "21:04",
     text: "想听点 city pop",
   },
@@ -147,7 +147,7 @@ export const mockMessages: ChatMessage[] = [
   {
     id: "u-2",
     kind: "user",
-    speaker: "mmguo",
+    speaker: "veko",
     timestamp: "21:09",
     text: "下一首换个语言",
   },
@@ -165,10 +165,39 @@ export const mockUpcoming: { track: Track; caption: string }[] = [
   { track: mockTracks[3], caption: "收尾，留一点夏夜的余温" },
 ]
 
+/** The day, pre-planned into time blocks — each with a vibe label, a target
+ * speaker, and a tracklist. Mirrors the original's terminal schedule view. */
+export const mockSchedule: { range: string; label: string; device: string; tracks: string[] }[] = [
+  {
+    range: "09:12–10:00",
+    label: "房间先醒",
+    device: "naim 宝宝",
+    tracks: ["颜色 · 许美静", "取消资格 · 陈小春", "分分钟需要你 · 林忆莲", "黑色领带 · 陈晓东"],
+  },
+  {
+    range: "10:00–12:00",
+    label: "深度工作",
+    device: "sony 小黑",
+    tracks: ["A Walk · Tycho", "Cirrus · Bonobo", "Open Eye Signal · Jon Hopkins", "Thrown · Kiasmos", "On the Nature of Daylight · Max Richter"],
+  },
+  {
+    range: "12:00–13:00",
+    label: "午休韩语",
+    device: "naim 宝宝",
+    tracks: ["Square · Yerin Baek", "Tik Tak Tok · 실리카겔"],
+  },
+  {
+    range: "21:00–23:30",
+    label: "今晚 · 收尾",
+    device: "naim 宝宝",
+    tracks: ["Says · Nils Frahm", "Plastic Love · Mariya Takeuchi", "如风 · 王菲"],
+  },
+]
+
 export const mockProfiles: Profile[] = [
   {
     id: "default",
-    name: "mmguo",
+    name: "veko",
     avatar: "🐱",
     corpus_dir: "profiles/default",
     created_at: Date.now() - 86400000 * 30,
@@ -211,7 +240,7 @@ export const mockHealth: HealthSnapshot = {
 export const mockTasteFiles = [
   {
     name: "taste.md",
-    body: `# mmguo · taste
+    body: `# veko · taste
 
 ## 永远会按
 - city pop / shibuya-kei (Mariya Takeuchi, Tatsuro Yamashita)
