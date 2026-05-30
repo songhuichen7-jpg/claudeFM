@@ -250,6 +250,16 @@ export const Plays = {
       )
       .all(profileId, since, limit) as { title: string; artist: string }[]
   },
+  // Distinct liked tracks (most-recent first) — backs the Library view.
+  likedTracks(limit = 200, profileId = ACTIVE): { id: string; title: string; artist: string; ts: number }[] {
+    return db
+      .prepare(
+        `SELECT track_id AS id, title, artist, MAX(ts) AS ts FROM plays
+         WHERE profile_id = ? AND liked = 1
+         GROUP BY track_id ORDER BY ts DESC LIMIT ?`,
+      )
+      .all(profileId, limit) as { id: string; title: string; artist: string; ts: number }[]
+  },
   recentLiked(hoursBack = 168, limit = 10, profileId = ACTIVE): { title: string; artist: string; ts: number }[] {
     const since = Date.now() - hoursBack * 3600_000
     return db

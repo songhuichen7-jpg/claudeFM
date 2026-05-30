@@ -5,9 +5,9 @@
 
 ## A. 地基（token + 状态层 + 后端新增）
 
-- [ ] A1. `src/index.css` 对齐原型 token：近黑底、单绿 `--accent`、等宽主体、点阵、`.shell-glow`、去紫渐变/glow。
-- [ ] A2. 后端加 `Plays.likedTracks()` + `GET /api/liked`（只增不改）；`api/client.ts` 加 `liked() / next() / planToday()`。
-- [ ] A3. `PlayerContext` 加法扩展：`toast`+`showToast`+`dismissToast`（toggleLike 时 fire）、`likedTracks`（拉 /api/liked + 本地合并）、`upcoming`（派生自 /api/next）。不动既有 audio/WS/analyser/ticket。
+- [x] A1. `src/index.css` 对齐原型 token：近黑底、单绿 `--accent`、等宽主体、点阵、`.shell-glow`、去紫渐变/glow。
+- [x] A2. 后端加 `Plays.likedTracks()` + `GET /api/liked`（只增不改）；`api/client.ts` 加 `liked() / next() / planToday()`。
+- [x] A3. `PlayerContext` 加法扩展：`toast`+`showToast`+`dismissToast`（toggleLike 时 fire）、`likedTracks`（拉 /api/liked + 本地合并）、`upcoming`（派生自 /api/next）。不动既有 audio/WS/analyser/ticket。
 
 ## B. 组件移植（prototype → src，改绑 usePlayer）
 

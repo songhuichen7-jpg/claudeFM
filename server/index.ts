@@ -257,6 +257,9 @@ fastify.get("/api/messages", async () => {
   })) }
 })
 
+// Distinct liked tracks for the active profile — backs the Library view.
+fastify.get("/api/liked", async () => ({ tracks: Plays.likedTracks() }))
+
 fastify.post("/api/skip", async (req) => {
   const body = (req.body ?? {}) as { trackId?: string }
   if (body.trackId) Plays.markSkipped(body.trackId)

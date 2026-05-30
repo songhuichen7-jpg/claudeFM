@@ -72,6 +72,12 @@ type PlayerState = {
   refreshTaste: () => Promise<{ name: string; body: string }[]>
   saveTasteFile: (name: string, body: string) => Promise<void>
 
+  // library (liked tracks) + up-next + ♥ toast — additive, see ARCHITECTURE §5
+  likedTracks: Track[]
+  upcoming: { track: Track; caption: string }[]
+  toast: { id: number; text: string; sub?: string } | null
+  dismissToast: () => void
+
   // actions
   toggleTheme: () => void
   toggleHideChat: () => void
@@ -113,6 +119,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [health, setHealth] = useState<Health | null>(null)
   const [connected, setConnected] = useState(false)
   const [profiles, setProfiles] = useState<Profile[]>([])
+
+  // Library / ♥ toast — additive UI state (ARCHITECTURE §5).
+  // `upcoming` is derived from the message stream in the value memo below.
+  const [likedTracks, setLikedTracks] = useState<Track[]>([])
+  const [toast, setToast] = useState<{ id: number; text: string; sub?: string } | null>(null)
+  const toastTimerRef = useRef<number | null>(null)
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const ttsRef = useRef<HTMLAudioElement | null>(null)
@@ -431,6 +443,36 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     ])
   }, [])
 
+  // ♥ toast (transient) + Library refresh ----------------------------------
+  const showToast = useCallback((text: string, sub?: string) => {
+    if (toastTimerRef.current != null) window.clearTimeout(toastTimerRef.current)
+    setToast({ id: Date.now(), text, sub })
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 2800)
+  }, [])
+
+  const dismissToast = useCallback(() => {
+    if (toastTimerRef.current != null) window.clearTimeout(toastTimerRef.current)
+    setToast(null)
+  }, [])
+
+  const refreshLiked = useCallback(async () => {
+    try {
+      const { tracks } = await api.liked()
+      setLikedTracks(
+        tracks.map(t => ({ id: t.id, title: t.title, artist: t.artist, duration: 0 } as Track)),
+      )
+      // Seed the boolean map so ♥ states render filled on load.
+      setLiked(prev => {
+        const next = { ...prev }
+        for (const t of tracks) next[t.id] = true
+        return next
+      })
+    } catch {}
+  }, [])
+
+  // Load the Library on mount (declared here, after refreshLiked, to avoid TDZ).
+  useEffect(() => { refreshLiked() }, [refreshLiked])
+
   const playTrack = useCallback((t: Track) => {
     const a = audioRef.current
     if (!a || !t.url) return
@@ -648,12 +690,27 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const toggleLike = useCallback((trackId?: string) => {
     const id = trackId ?? currentTrack?.id
     if (!id) return
+    // Resolve the track object (current, recently-seen, or known liked) for
+    // the toast sub-line + optimistic Library update.
+    const track =
+      (currentTrack?.id === id ? currentTrack : undefined) ??
+      recentTracksRef.current.get(id) ??
+      likedTracks.find(t => t.id === id)
     setLiked(prev => {
-      const liked = !prev[id]
-      api.like(id, liked).catch(() => undefined)
-      return { ...prev, [id]: liked }
+      const nextLiked = !prev[id]
+      api.like(id, nextLiked).catch(() => undefined)
+      if (track) {
+        if (nextLiked) {
+          showToast("记进了你的品味", `${track.title} · ${track.artist}`)
+          setLikedTracks(list => (list.some(t => t.id === id) ? list : [track, ...list]))
+        } else {
+          showToast("从品味里移除", `${track.title} · ${track.artist}`)
+          setLikedTracks(list => list.filter(t => t.id !== id))
+        }
+      }
+      return { ...prev, [id]: nextLiked }
     })
-  }, [currentTrack])
+  }, [currentTrack, likedTracks, showToast])
 
   const setVolume = useCallback((v: number) => {
     setVolumeState(Math.max(0, Math.min(1, v)))
@@ -747,15 +804,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setCurrentTrack(null)
       setCurrentTime(0)
       setDuration(0)
+      setLiked({})
+      setLikedTracks([])
       const ms = await api.messages()
       applyServerMessages(ms.messages)
       const h = await api.health()
       setHealth(h)
       await refreshProfiles()
+      await refreshLiked()
     } catch (err) {
       console.warn("[ctx] switchProfile failed", err)
     }
-  }, [applyServerMessages, refreshProfiles])
+  }, [applyServerMessages, refreshProfiles, refreshLiked])
 
   const createProfile = useCallback(async (id: string, name: string) => {
     try {
@@ -794,6 +854,25 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { refreshProfiles() }, [refreshProfiles])
 
+  // Up-next, derived from the message stream: the most recent DJ-recommended
+  // tracks Claudio has surfaced, minus whatever is playing now. Real radio has
+  // no fixed queue — this is "what Claudio has lined up", deduped.
+  const upcoming = useMemo(() => {
+    const seen = new Set<string>(currentTrack ? [currentTrack.id] : [])
+    const out: { track: Track; caption: string }[] = []
+    for (let i = messages.length - 1; i >= 0 && out.length < 6; i--) {
+      const m = messages[i]
+      if (m.kind !== "dj") continue
+      const dj = m as DJMessage
+      for (const t of dj.recommends ?? []) {
+        if (seen.has(t.id)) continue
+        seen.add(t.id)
+        out.push({ track: t, caption: dj.text.slice(0, 48) })
+      }
+    }
+    return out
+  }, [messages, currentTrack])
+
   const value = useMemo<PlayerState>(() => ({
     currentTrack,
     isPlaying,
@@ -816,6 +895,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     createProfile,
     refreshTaste,
     saveTasteFile,
+    likedTracks,
+    upcoming,
+    toast,
+    dismissToast,
     toggleTheme,
     toggleHideChat,
     togglePlay,
@@ -835,6 +918,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     theme, hideChat, status, messages, activeDJId, djElapsedMs,
     health, connected, profiles,
     refreshProfiles, switchProfile, createProfile, refreshTaste, saveTasteFile,
+    likedTracks, upcoming, toast, dismissToast,
     toggleTheme, toggleHideChat, togglePlay, setPlaying, next, prev,
     stop, toggleLike, setVolume, seek, selectTrack, sendMessage, replayDJ, triggerScheduled,
   ])
