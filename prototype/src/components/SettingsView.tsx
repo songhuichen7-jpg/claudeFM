@@ -136,22 +136,6 @@ export function SettingsView({ open, onClose }: Props) {
           </p>
         </Section>
 
-        {/* Sora import */}
-        <Section title="从汽水音乐导入 · IMPORT" action={<span className="font-mono text-[9px] tracking-[0.12em] text-white/30 light:text-black/40">paste → Claude</span>}>
-          <p className="font-mono text-[11px] leading-relaxed text-white/45 light:text-black/50">
-            把最近听的歌粘进来，Claude 对照 taste.md / playlists.json 给改写提案，你确认后才落盘。
-          </p>
-          <textarea
-            spellCheck={false}
-            placeholder={`例：\n- Plastic Love · Mariya Takeuchi\n- 起风了 · 买辣椒也用券`}
-            className="thin-scroll mt-2 h-24 w-full resize-y rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[11px] leading-relaxed text-white/85 outline-none placeholder:text-white/25 light:border-black/10 light:bg-white/40 light:text-black/80"
-          />
-          <div className="mt-2 flex justify-end gap-2">
-            <TinyBtn>Claude 分析</TinyBtn>
-            <TinyBtn solid>应用</TinyBtn>
-          </div>
-        </Section>
-
         {/* Taste files */}
         <Section title={`品味语料 · ${active}`}>
           <div className="flex flex-col gap-1">
