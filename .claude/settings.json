@@ -1,0 +1,9 @@
+{
+  "hooks": {
+    "Stop": [
+      { "matcher": "", "hooks": [
+        { "type": "command", "command": "bash /Users/veko/.claude/skills/sdd/scripts/doc-sync-check.sh" }
+      ]}
+    ]
+  }
+}
