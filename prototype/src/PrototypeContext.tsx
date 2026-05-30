@@ -248,15 +248,13 @@ export function PrototypeProvider({ children }: { children: ReactNode }) {
       const nextLiked = !prev[id]
       const all = [...mockTracks, ...upcoming.map(u => u.track)]
       const t = all.find(x => x.id === id) ?? currentTrack
-      const moodLabel = currentMoodId
-      const mood = mockMoods.find(m => m.id === moodLabel)
       if (t) {
-        if (nextLiked) showToast(`已记入「${mood?.label ?? moodLabel}」`, `${t.title} · ${t.artist}`)
-        else showToast(`从「${mood?.label ?? moodLabel}」移除`, `${t.title} · ${t.artist}`)
+        if (nextLiked) showToast("记进了你的品味", `${t.title} · ${t.artist}`)
+        else showToast("从品味里移除", `${t.title} · ${t.artist}`)
       }
       return { ...prev, [id]: nextLiked }
     })
-  }, [currentTrack, currentMoodId, upcoming, showToast])
+  }, [currentTrack, upcoming, showToast])
 
   const setVolume = useCallback((v: number) => {
     setVolumeState(Math.max(0, Math.min(1, v)))

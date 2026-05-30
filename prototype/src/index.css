@@ -11,6 +11,10 @@
   --font-pixel: "Doto", "VT323", ui-monospace, monospace;
   --font-pixel-tight: "VT323", "Doto", ui-monospace, monospace;
 
+  /* Single accent — a muted spring green (terminal, not neon-mint). */
+  --accent: #34e29b;
+  --accent-soft: rgba(52, 226, 155, 0.14);
+
   /* Brand */
   --color-claudio-bg: #000000;
   --color-claudio-surface: #0a0a0d;
@@ -56,10 +60,11 @@ html, body, #root {
   height: 100%;
   width: 100%;
   color: var(--color-claudio-ink);
-  font-family: var(--font-sans);
+  /* Monospace is the primary voice of the product (terminal × editorial).
+     System sans is reserved for the big Focus-card song titles. */
+  font-family: var(--font-mono);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: "cv11", "ss01", "ss03";
   overscroll-behavior: none;
 }
 
@@ -68,10 +73,7 @@ html.dark, html.dark body, html.dark #root {
 }
 
 html.dark body {
-  background:
-    radial-gradient(ellipse at 50% 0%, rgba(124, 92, 255, 0.18) 0%, transparent 55%),
-    radial-gradient(ellipse at 80% 100%, rgba(184, 108, 255, 0.12) 0%, transparent 60%),
-    #000;
+  background: #060607;
   min-height: 100svh;
   overflow: hidden;
 }
@@ -83,10 +85,7 @@ html.light, html.light body, html.light #root {
 }
 
 html.light body {
-  background:
-    radial-gradient(ellipse at 50% 0%, rgba(124, 92, 255, 0.10) 0%, transparent 55%),
-    radial-gradient(ellipse at 80% 100%, rgba(184, 108, 255, 0.08) 0%, transparent 60%),
-    var(--color-claudio-bg-light);
+  background: var(--color-claudio-bg-light);
   min-height: 100svh;
   overflow: hidden;
 }
@@ -109,34 +108,29 @@ html.light .thin-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12);
 }
 
 /* Selection */
-::selection { background: rgba(124, 92, 255, 0.45); color: #fff; }
+::selection { background: rgba(52, 226, 155, 0.30); color: #fff; }
 
-/* Dotted matrix background helper */
+/* Fine engineering dot-grid — lives inside bordered panels. */
 .dot-matrix {
-  background-image: radial-gradient(circle, currentColor 1px, transparent 1.4px);
-  background-size: 14px 14px;
+  background-image: radial-gradient(circle, currentColor 0.8px, transparent 1.1px);
+  background-size: 18px 18px;
 }
-html.light .dot-matrix { color: rgba(20, 19, 26, 0.22); }
-html.dark .dot-matrix, html:not(.light) .dot-matrix { color: rgba(255, 255, 255, 0.10); }
+html.light .dot-matrix { color: rgba(20, 19, 26, 0.16); }
+html.dark .dot-matrix, html:not(.light) .dot-matrix { color: rgba(255, 255, 255, 0.07); }
 
-/* Live blink */
+/* Live blink — uses the single accent, no neon halo. */
 @keyframes live-pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(41,255,184,0.65); }
-  50% { opacity: 0.55; box-shadow: 0 0 2px rgba(41,255,184,0.35); }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 .live-dot {
-  animation: live-pulse 1.4s ease-in-out infinite;
+  animation: live-pulse 1.6s ease-in-out infinite;
 }
 
-/* Word-highlight transition */
-.word { transition: color 180ms var(--ease-pop), text-shadow 240ms var(--ease-pop); }
-.word.active {
-  color: #29ffb8;
-  text-shadow: 0 0 14px rgba(41, 255, 184, 0.45);
-}
-.word.past {
-  color: var(--color-claudio-ink-dim);
-}
+/* Word-highlight: active line goes accent-green; past lines dim. No glow. */
+.word { transition: color 160ms var(--ease-pop); }
+.word.active { color: var(--accent); }
+.word.past { color: var(--color-claudio-ink-dim); }
 html.light .word.past { color: var(--color-claudio-ink-dim-light); }
 
 /* Capsule input ring */
