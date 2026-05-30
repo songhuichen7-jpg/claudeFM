@@ -1,40 +1,47 @@
 import { useEffect, useRef } from "react"
-import { Play, PlayCircle } from "lucide-react"
+import { Play } from "lucide-react"
 import { usePlayer } from "../state/PlayerContext"
-import type { ChatMessage, DJMessage, Track } from "../data/types"
+import type { ChatMessage, Track } from "../data/types"
 
+/**
+ * The live chat stream — the spine of the home view (the prototype's ChatLive).
+ * Monospace throughout, hairline-bordered message bubbles, ▸ track cards, the
+ * DJ's current line karaoke-highlights word by word in the single accent.
+ * (Historically named ChatStream.)
+ */
 export function ChatStream() {
-  const { messages, activeDJId, djElapsedMs, replayDJ, selectTrack } = usePlayer()
+  const { messages, activeDJId, djElapsedMs, replayDJ, selectTrack, liked, toggleLike } = usePlayer()
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const el = ref.current
-    if (!el) return
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
   }, [messages.length])
 
   return (
-    <div className="mx-3 mb-3 flex-1 overflow-hidden">
-      <div className="flex items-center justify-between border-t border-white/8 px-1 pt-3 pb-1 light:border-black/10">
-        <div className="flex items-center gap-2 text-white/85 light:text-black/80">
-          <span className="live-dot inline-block h-1.5 w-1.5 rounded-full bg-[#29ffb8]" />
-          <span className="font-pixel text-[12px] tracking-[0.18em]">Claudio</span>
+    <div className="border-t border-white/8 px-4 pt-3 sm:px-5 light:border-black/10">
+      <div className="flex items-center justify-between pb-2">
+        <div className="flex items-center gap-2">
+          <span className="live-dot inline-block h-1.5 w-1.5 rounded-full" style={{ background: "var(--accent)" }} />
+          <span className="font-pixel text-[14px] tracking-[0.06em] text-white/90 light:text-black/85">Claudio</span>
         </div>
-        <span className="font-pixel text-[10px] tracking-[0.22em] text-[#0a8e6a] dark:text-[#29ffb8]">LIVE</span>
+        <span className="font-mono text-[9px] tracking-[0.3em]" style={{ color: "var(--accent)" }}>LIVE</span>
       </div>
 
-      <div
-        ref={ref}
-        className="thin-scroll relative h-full max-h-[320px] overflow-y-auto pr-1 pb-2 pt-1"
-      >
+      <div ref={ref} className="pb-2">
+        <div className="py-2 text-center font-mono text-[9px] tracking-[0.3em] text-white/25 light:text-black/30">
+          CONNECTED TO CLAUDIO SERVER
+        </div>
         {messages.map(m => (
           <Row
             key={m.id}
             msg={m}
-            activeDJId={activeDJId}
-            djElapsedMs={djElapsedMs}
+            active={activeDJId === m.id}
+            elapsedMs={djElapsedMs}
             onReplay={replayDJ}
-            onPlayTrack={selectTrack}
+            onPlay={selectTrack}
+            onLike={toggleLike}
+            liked={liked}
           />
         ))}
       </div>
@@ -44,155 +51,131 @@ export function ChatStream() {
 
 function Row({
   msg,
-  activeDJId,
-  djElapsedMs,
+  active,
+  elapsedMs,
   onReplay,
-  onPlayTrack,
+  onPlay,
+  onLike,
+  liked,
 }: {
   msg: ChatMessage
-  activeDJId: string | null
-  djElapsedMs: number
+  active: boolean
+  elapsedMs: number
   onReplay: (id: string) => void
-  onPlayTrack: (t: Track) => void
+  onPlay: (t: Track) => void
+  onLike: (id: string) => void
+  liked: Record<string, boolean>
 }) {
   if (msg.kind === "system") {
     return (
-      <div className="my-3 flex items-center justify-center gap-2 font-pixel text-[10px] tracking-[0.28em] text-white/35 light:text-black/35">
-        <span className="h-px w-8 bg-white/10 light:bg-black/10" />
-        <span>{msg.text}</span>
-        <span className="h-px w-8 bg-white/10 light:bg-black/10" />
+      <div className="py-2.5 text-center font-mono text-[9px] tracking-[0.3em] text-white/25 light:text-black/30">
+        {msg.text}
       </div>
     )
   }
 
   if (msg.kind === "user") {
     return (
-      <div className="my-2 flex items-end justify-end gap-2 pl-12">
-        <div className="rounded-2xl rounded-br-md bg-white/8 px-3.5 py-2 font-serif text-[15px] leading-snug text-white/90 light:bg-black/8 light:text-black/85">
+      <div className="my-2 flex flex-col items-end">
+        <span className="mb-1 font-mono text-[9px] tracking-[0.26em] text-white/35 light:text-black/40">
+          VEKO · {msg.timestamp}
+        </span>
+        <div className="max-w-[80%] rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 font-mono text-[13px] leading-relaxed text-white/85 light:border-black/10 light:bg-black/[0.03] light:text-black/85">
           {msg.text}
-        </div>
-        <div className="flex flex-col items-center gap-0.5">
-          <span className="font-pixel text-[9px] tracking-[0.18em] text-white/40 light:text-black/40">
-            {msg.timestamp}
-          </span>
-          <UserAvatar />
         </div>
       </div>
     )
   }
 
-  // DJ
   return (
-    <div className="my-2 flex gap-2 pr-8">
-      <DJAvatar />
-      <div className="flex min-w-0 flex-col gap-1">
-        <div className="flex items-baseline gap-1.5">
-          <span className="font-pixel text-[11px] tracking-[0.22em] text-white/80 light:text-black/75">
-            CLAUDIO
-          </span>
-          <span className="font-pixel text-[9px] tracking-[0.18em] text-white/35 light:text-black/40">
-            • DJ
-          </span>
-        </div>
-        <div className="rounded-2xl rounded-tl-md border border-white/6 bg-white/[0.04] px-3.5 py-2.5 light:border-black/8 light:bg-black/[0.03]">
-          <DJWords msg={msg} active={activeDJId === msg.id} elapsedMs={djElapsedMs} />
-          {msg.recommends?.length ? (
-            <div className="mt-2.5 flex flex-col gap-1.5">
-              {msg.recommends.map(t => (
-                <TrackCard key={t.id} track={t} onPlay={() => onPlayTrack(t)} />
-              ))}
-            </div>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-2 pl-1">
-          <span className="font-pixel text-[9px] tracking-[0.2em] text-white/35 light:text-black/40">
-            {msg.timestamp}
-          </span>
-          {msg.hasReplay ? (
-            <button
-              type="button"
-              onClick={() => onReplay(msg.id)}
-              className="inline-flex items-center gap-1 font-pixel text-[10px] tracking-[0.16em] text-white/65 hover:text-white light:text-black/65 light:hover:text-black"
-            >
-              <Play size={9} fill="currentColor" />
-              REPLAY
-            </button>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function DJWords({
-  msg,
-  active,
-  elapsedMs,
-}: {
-  msg: DJMessage
-  active: boolean
-  elapsedMs: number
-}) {
-  return (
-    <p className="font-serif text-[15.5px] leading-[1.55] text-white/85 light:text-black/85">
-      {msg.words.map((w, i) => {
-        if (!w.text.trim()) return <span key={i}>{w.text}</span>
-        let cls = ""
-        if (active) {
-          if (elapsedMs >= w.start && elapsedMs <= w.end) cls = "word active"
-          else if (elapsedMs > w.end) cls = "word past"
-          else cls = "word"
-        }
-        return (
-          <span key={i} className={cls}>
-            {w.text}
-          </span>
-        )
-      })}
-    </p>
-  )
-}
-
-function TrackCard({ track, onPlay }: { track: Track; onPlay: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onPlay}
-      className="group flex w-full items-center gap-2.5 rounded-xl border border-white/6 bg-black/30 px-2.5 py-1.5 text-left transition-colors hover:border-white/15 hover:bg-black/40 light:border-black/8 light:bg-white/40 light:hover:border-black/20"
-    >
-      <PlayCircle
-        size={22}
-        className="shrink-0 text-white/70 transition-colors group-hover:text-[#29ffb8] light:text-black/70"
-      />
-      <div className="min-w-0 flex-1">
-        <div className="truncate font-serif text-[14px] leading-tight text-white/95 light:text-black/85">
-          <span className="italic">{track.title}</span>
-          <span className="mx-1 text-white/30">·</span>
-          <span className="text-white/70 light:text-black/65">{track.artist}</span>
-        </div>
-        {track.era && (
-          <div className="font-pixel text-[9px] tracking-[0.22em] text-white/35 light:text-black/40">
-            {track.era}
-            {track.album ? ` · ${track.album}` : ""}
-          </div>
+    <div className="my-3">
+      <div className="mb-1 flex items-center gap-2">
+        <span className="font-mono text-[9px] tracking-[0.26em] text-white/45 light:text-black/45">CLAUDIO</span>
+        {active && (
+          <span className="font-mono text-[9px] tracking-[0.26em]" style={{ color: "var(--accent)" }}>· LIVE</span>
         )}
       </div>
-    </button>
-  )
-}
-
-function DJAvatar() {
-  return (
-    <div className="mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet-500/40 to-fuchsia-500/30 ring-1 ring-white/15">
-      <span className="font-pixel text-[11px] text-white">C</span>
+      <div className="rounded-lg border border-white/8 bg-white/[0.02] px-3.5 py-3 light:border-black/8 light:bg-black/[0.02]">
+        <p className="font-mono text-[13px] leading-[1.7] text-white/85 light:text-black/85">
+          {msg.words.map((w, i) => {
+            if (!w.text.trim()) return <span key={i}>{w.text}</span>
+            let cls = ""
+            if (active) {
+              if (elapsedMs >= w.start && elapsedMs <= w.end) cls = "word active"
+              else if (elapsedMs > w.end) cls = "word past"
+              else cls = "word"
+            }
+            return <span key={i} className={cls}>{w.text}</span>
+          })}
+        </p>
+        {msg.recommends?.length ? (
+          <div className="mt-2.5 flex flex-col gap-1">
+            {msg.recommends.map(t => (
+              <TrackCard key={t.id} track={t} onPlay={() => onPlay(t)} onLike={() => onLike(t.id)} liked={!!liked[t.id]} />
+            ))}
+          </div>
+        ) : null}
+      </div>
+      <div className="mt-1 flex items-center gap-3 pl-0.5">
+        <span className="font-mono text-[9px] tracking-[0.24em] text-white/30 light:text-black/40">{msg.timestamp}</span>
+        {msg.hasReplay && (
+          <button
+            type="button"
+            onClick={() => onReplay(msg.id)}
+            className="inline-flex items-center gap-1 font-mono text-[9px] tracking-[0.2em] text-white/45 transition-colors hover:text-white/85 light:text-black/45 light:hover:text-black/85"
+          >
+            <Play size={8} fill="currentColor" /> REPLAY
+          </button>
+        )}
+      </div>
     </div>
   )
 }
 
-function UserAvatar() {
+function TrackCard({
+  track,
+  onPlay,
+  onLike,
+  liked,
+}: {
+  track: Track
+  onPlay: () => void
+  onLike: () => void
+  liked: boolean
+}) {
   return (
-    <div className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-gradient-to-br from-orange-400/60 to-rose-500/40 ring-1 ring-white/15">
-      <span className="font-pixel text-[9px] text-white">m</span>
+    <div
+      className="group flex items-center gap-2.5 rounded-md border px-2.5 py-1.5 transition-colors"
+      style={
+        liked
+          ? { borderColor: "color-mix(in srgb, var(--accent) 45%, transparent)", background: "var(--accent-soft)" }
+          : { borderColor: "rgba(255,255,255,0.08)" }
+      }
+    >
+      <button type="button" onClick={onPlay} aria-label="Play" className="text-white/55 transition-colors hover:text-white light:text-black/55 light:hover:text-black">
+        <Play size={13} fill="currentColor" />
+      </button>
+      <button type="button" onClick={onPlay} className="min-w-0 flex-1 text-left">
+        <div className="truncate font-mono text-[12px] tracking-[0.01em] text-white/85 light:text-black/85">
+          {track.title}
+          <span className="mx-1 text-white/30">·</span>
+          <span className="text-white/55 light:text-black/55">{track.artist}</span>
+        </div>
+        {track.era && (
+          <div className="font-mono text-[8.5px] tracking-[0.26em] text-white/30 light:text-black/40">{track.era}</div>
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={onLike}
+        aria-label="Like"
+        className="font-mono text-[14px] leading-none"
+        style={{ color: liked ? "var(--accent)" : undefined }}
+      >
+        <span className={liked ? "" : "text-white/25 opacity-0 group-hover:opacity-100 light:text-black/30"}>
+          {liked ? "♥" : "♡"}
+        </span>
+      </button>
     </div>
   )
 }

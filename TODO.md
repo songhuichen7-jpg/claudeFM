@@ -11,19 +11,19 @@
 
 ## B. 组件移植（prototype → src，改绑 usePlayer）
 
-- [ ] B1. `Shell`（去渐变 blob + vignette）。
-- [ ] B2. `Header`（字标 + ♥N Library + 齿轮 + DARK/LIGHT）。
-- [ ] B3. `ClockPanel`（点阵 + 像素钟 + ON AIR，点击进 Focus）。
-- [ ] B4. `PlayerBar`（EQ + 传输 + HIDE/FAV/VOL + 进度 + QUEUE 计数）。
-- [ ] B5. `ChatLive`（发丝气泡 + ▸曲目卡 + 逐字高亮 + REPLAY）。
-- [ ] B6. `Composer`（输入 + mic + 发送；聚焦 accent）。
-- [ ] B7. `Toast`（♥ 反馈）。
-- [ ] B8. `FocusView`（白卡 over 星空 + 波形 + 大歌名 + 转录）。
-- [ ] B9. `LibraryView`（喜欢曲目列表，绑 likedTracks）。
-- [ ] B10. `SettingsView`（状态/语料档/今日编排(plan)/网易云/品味语料，等宽单绿）。
-- [ ] B11. `ProfileCard`（像素 Claudio + 流派标签）。
-- [ ] B12. `App.tsx` 重组单列布局 + 接 Library/Toast；删除/替换旧 `Clock/Player/ChatStream/InputBar`。
-- [ ] B13. veko 改名、点歌话术、去掉汽水导入入口 —— 全部对齐原型。
+- [x] B1. `Shell`（去渐变 blob + vignette）。
+- [x] B2. `Header`（字标 + ♥N Library + 齿轮 + DARK/LIGHT）。
+- [x] B3. `ClockPanel`（点阵 + 像素钟 + ON AIR，点击进 Focus）。
+- [x] B4. `PlayerBar`（EQ + 传输 + HIDE/FAV/VOL + 进度 + QUEUE 计数）。
+- [x] B5. `ChatLive`（发丝气泡 + ▸曲目卡 + 逐字高亮 + REPLAY）。
+- [x] B6. `Composer`（输入 + mic + 发送；聚焦 accent）。
+- [x] B7. `Toast`（♥ 反馈）。
+- [x] B8. `FocusView`（白卡 over 星空 + 波形 + 大歌名 + 转录）。
+- [x] B9. `LibraryView`（喜欢曲目列表，绑 likedTracks）。
+- [x] B10. `SettingsView`（状态/语料档/今日编排(plan)/网易云/品味语料，等宽单绿）。
+- [x] B11. `ProfileCard`（像素 Claudio + 流派标签）。
+- [x] B12. `App.tsx` 重组单列布局 + 接 Library/Toast；删除/替换旧 `Clock/Player/ChatStream/InputBar`。
+- [x] B13. veko 改名、点歌话术、去掉汽水导入入口 —— 全部对齐原型。
 
 ## C. 收尾
 

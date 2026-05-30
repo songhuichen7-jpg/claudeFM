@@ -4,6 +4,7 @@
 // with the chosen fields.
 
 import { spawn } from "node:child_process"
+import { tmpdir as __tmpdir } from "node:os"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { askDJ } from "./claude.js"
@@ -229,7 +230,7 @@ export async function analyzePasteRaw(paste: string): Promise<TasteProposal> {
       "json",
       "--model",
       "claude-sonnet-4-6",
-    ], { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env } })
+    ], { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env }, cwd: __tmpdir() })
 
     let stdout = ""
     let stderr = ""
@@ -286,7 +287,7 @@ export async function rebuildPasteRaw(paste: string): Promise<TasteProposal> {
       "json",
       "--model",
       "claude-sonnet-4-6",
-    ], { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env } })
+    ], { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env }, cwd: __tmpdir() })
 
     let stdout = ""
     let stderr = ""

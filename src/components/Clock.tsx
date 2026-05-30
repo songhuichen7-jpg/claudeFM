@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react"
-import { usePlayer } from "../state/PlayerContext"
 
-const DAY_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const
-const MONTH = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"] as const
+const DAY = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
+const MON = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
+const p2 = (n: number) => String(n).padStart(2, "0")
 
-function pad2(n: number) {
-  return String(n).padStart(2, "0")
-}
-
+/**
+ * The centerpiece clock panel: a hairline-bordered box filled with a fine
+ * dot-grid, a big pixel-font HH:MM, weekday/date and an ON AIR status.
+ * (Historically named Clock; renders the ClockPanel from the prototype.)
+ */
 export function Clock({ onTap }: { onTap?: () => void }) {
-  const { activeDJId } = usePlayer()
   const [now, setNow] = useState(() => new Date())
   const [colon, setColon] = useState(true)
 
@@ -21,52 +21,30 @@ export function Clock({ onTap }: { onTap?: () => void }) {
     return () => window.clearInterval(t)
   }, [])
 
-  const hh = pad2(now.getHours())
-  const mm = pad2(now.getMinutes())
-  const day = DAY_FULL[now.getDay()]
-  const dd = pad2(now.getDate())
-  const mo = MONTH[now.getMonth()]
-  const yr = now.getFullYear()
-
-  const status = activeDJId ? "Speaking" : "ON AIR"
-
   return (
-    <section
+    <button
+      type="button"
       onClick={onTap}
-      className="relative mx-3 mb-3 cursor-pointer overflow-hidden rounded-2xl border border-white/8 bg-black/40 px-6 pt-7 pb-6 transition-colors hover:border-white/15 dark:bg-black/40 light:border-black/8 light:bg-white/60 light:hover:border-black/20"
+      className="group relative block w-full overflow-hidden rounded-xl border border-white/10 bg-white/[0.015] px-6 pt-8 pb-7 text-left transition-colors hover:border-white/20 light:border-black/10 light:bg-black/[0.015] light:hover:border-black/20"
     >
-      <div className="dot-matrix pointer-events-none absolute inset-0 opacity-90" aria-hidden />
-      {/* corner ticks */}
-      <CornerTicks />
+      <div className="dot-matrix pointer-events-none absolute inset-0" aria-hidden />
       <div className="relative flex flex-col items-center">
-        <div className="flex items-end gap-2 font-pixel text-[88px] leading-[0.85] tracking-[0.02em] text-white drop-shadow-[0_0_18px_rgba(255,255,255,0.15)] dark:text-white light:text-black/85">
-          <span>{hh}</span>
-          <span className={colon ? "opacity-100" : "opacity-25"}>:</span>
-          <span>{mm}</span>
+        <div className="flex items-end gap-2 font-pixel text-[72px] leading-[0.8] tracking-[0.04em] text-white sm:text-[88px] light:text-black/85">
+          <span>{p2(now.getHours())}</span>
+          <span className={colon ? "opacity-100" : "opacity-20"}>:</span>
+          <span>{p2(now.getMinutes())}</span>
         </div>
-        <div className="mt-3 font-pixel text-[13px] tracking-[0.22em] text-white/80 light:text-black/70">
-          {day}
+        <div className="mt-4 font-mono text-[11px] tracking-[0.34em] text-white/70 light:text-black/65">
+          {DAY[now.getDay()]}
         </div>
-        <div className="mt-1.5 font-pixel text-[11px] tracking-[0.32em] text-white/45 light:text-black/45">
-          {dd} · {mo} · {yr}
+        <div className="mt-1.5 font-mono text-[10px] tracking-[0.34em] text-white/35 light:text-black/40">
+          {p2(now.getDate())} {MON[now.getMonth()]} {now.getFullYear()}
         </div>
         <div className="mt-3 flex items-center gap-1.5">
-          <span className="live-dot inline-block h-1.5 w-1.5 rounded-full bg-[#0a8e6a] dark:bg-[#29ffb8]" aria-hidden />
-          <span className="font-pixel text-[11px] tracking-[0.24em] text-[#0a8e6a] dark:text-[#29ffb8]">{status}</span>
+          <span className="live-dot inline-block h-1.5 w-1.5 rounded-full" style={{ background: "var(--accent)" }} />
+          <span className="font-mono text-[10px] tracking-[0.34em]" style={{ color: "var(--accent)" }}>ON AIR</span>
         </div>
       </div>
-    </section>
-  )
-}
-
-function CornerTicks() {
-  const tick = "absolute h-3 w-3 border-white/30 light:border-black/30"
-  return (
-    <>
-      <span className={`${tick} left-2 top-2 border-l border-t`} />
-      <span className={`${tick} right-2 top-2 border-r border-t`} />
-      <span className={`${tick} left-2 bottom-2 border-l border-b`} />
-      <span className={`${tick} right-2 bottom-2 border-r border-b`} />
-    </>
+    </button>
   )
 }

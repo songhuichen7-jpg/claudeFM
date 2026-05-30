@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react"
-import { ChevronDown, RefreshCw, Save, Wifi, WifiOff, Plus, Check, Trash2, Sparkles, ArrowRight } from "lucide-react"
+import { Check, Plus, RefreshCw, Save, X } from "lucide-react"
 import { clsx } from "clsx"
 import { usePlayer } from "../state/PlayerContext"
-import { api, type TasteProposal } from "../api/client"
+import { api } from "../api/client"
 
+const ACCENT = "var(--accent)"
 type Props = { open: boolean; onClose: () => void }
 
 export function SettingsView({ open, onClose }: Props) {
@@ -11,8 +12,6 @@ export function SettingsView({ open, onClose }: Props) {
     health,
     connected,
     triggerScheduled,
-    theme,
-    toggleTheme,
     profiles,
     refreshProfiles,
     switchProfile,
@@ -20,12 +19,14 @@ export function SettingsView({ open, onClose }: Props) {
     refreshTaste,
     saveTasteFile,
   } = usePlayer()
+
   const [taste, setTaste] = useState<{ name: string; body: string }[] | null>(null)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [savedAt, setSavedAt] = useState<Record<string, number>>({})
   const [savingName, setSavingName] = useState<string | null>(null)
   const [openFile, setOpenFile] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [plan, setPlan] = useState<unknown>(null)
 
   const [newProfileOpen, setNewProfileOpen] = useState(false)
   const [npId, setNpId] = useState("")
@@ -43,6 +44,7 @@ export function SettingsView({ open, onClose }: Props) {
       })
       .catch(() => setTaste([]))
     refreshProfiles()
+    api.planToday().then(r => setPlan(r.plan)).catch(() => setPlan(null))
   }, [open, refreshTaste, refreshProfiles, active])
 
   useEffect(() => {
@@ -67,10 +69,7 @@ export function SettingsView({ open, onClose }: Props) {
     setSavingName(name)
     try {
       await saveTasteFile(name, drafts[name] ?? "")
-      // Mark saved (collapse dirty state)
-      setTaste(prev =>
-        prev ? prev.map(f => (f.name === name ? { ...f, body: drafts[name] ?? "" } : f)) : prev,
-      )
+      setTaste(prev => (prev ? prev.map(f => (f.name === name ? { ...f, body: drafts[name] ?? "" } : f)) : prev))
       setSavedAt(s => ({ ...s, [name]: Date.now() }))
     } catch (err) {
       alert(`保存失败：${(err as Error).message}`)
@@ -92,74 +91,53 @@ export function SettingsView({ open, onClose }: Props) {
   }
 
   return (
-    <div className="absolute inset-0 z-40 flex flex-col bg-[#07070b] text-white">
-      <div className="flex items-center justify-between px-5 pt-4 pb-2">
-        <span className="font-pixel text-[22px] tracking-[0.02em]">Settings</span>
+    <div className="absolute inset-0 z-40 flex flex-col bg-[#060607]/97 backdrop-blur-sm light:bg-[#f4f1ea]/97">
+      <div className="flex items-center justify-between border-b border-white/8 px-5 pt-4 pb-3 light:border-black/10">
+        <span className="font-pixel text-[18px] tracking-[0.04em] text-white/90 light:text-black/85">Settings</span>
         <button
           type="button"
           onClick={onClose}
-          className="grid h-9 w-9 place-items-center rounded-full bg-white/5 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
           aria-label="Close settings"
+          className="grid h-7 w-7 place-items-center rounded-md text-white/55 transition-colors hover:bg-white/8 hover:text-white light:text-black/55 light:hover:bg-black/8 light:hover:text-black"
         >
-          <ChevronDown size={18} />
+          <X size={15} />
         </button>
       </div>
 
-      <div className="thin-scroll flex-1 overflow-y-auto px-5 pb-5">
-        {/* Profile picker */}
-        <section className="mb-5 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-pixel text-[12px] tracking-[0.22em] text-white/55">语料档</h3>
-            <button
-              type="button"
-              onClick={() => setNewProfileOpen(o => !o)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1 font-pixel text-[10px] tracking-[0.18em] text-white/80 hover:bg-white/8"
-            >
-              <Plus size={11} /> 新建
-            </button>
-          </div>
-
+      <div className="thin-scroll flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+        {/* Corpus / profiles */}
+        <Section
+          title="语料档 · CORPUS"
+          action={
+            <TinyBtn onClick={() => setNewProfileOpen(o => !o)}>
+              <Plus size={11} className="-mt-px inline" /> 新建
+            </TinyBtn>
+          }
+        >
           {newProfileOpen && (
-            <div className="mt-3 rounded-xl bg-black/40 p-3">
-              <div className="mb-2 grid grid-cols-2 gap-2">
+            <div className="mb-2 rounded-md border border-white/8 p-3 light:border-black/8">
+              <div className="grid grid-cols-2 gap-2">
                 <input
                   value={npId}
                   onChange={e => setNpId(e.target.value.toLowerCase())}
                   placeholder="id (a-z0-9_-)"
-                  className="rounded-md bg-white/5 px-2 py-1.5 font-mono text-[12px] text-white outline-none placeholder:text-white/30"
+                  className="rounded-md border border-white/10 bg-black/30 px-2 py-1.5 font-mono text-[12px] text-white outline-none placeholder:text-white/30 light:border-black/10 light:bg-white/50 light:text-black/80"
                 />
                 <input
                   value={npName}
                   onChange={e => setNpName(e.target.value)}
                   placeholder="显示名"
-                  className="rounded-md bg-white/5 px-2 py-1.5 font-mono text-[12px] text-white outline-none placeholder:text-white/30"
+                  className="rounded-md border border-white/10 bg-black/30 px-2 py-1.5 font-mono text-[12px] text-white outline-none placeholder:text-white/30 light:border-black/10 light:bg-white/50 light:text-black/80"
                 />
               </div>
-              {npErr && (
-                <p className="mb-2 font-mono text-[11px] text-rose-400">{npErr}</p>
-              )}
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setNewProfileOpen(false)}
-                  className="rounded-md px-2.5 py-1 font-pixel text-[10px] tracking-[0.18em] text-white/55 hover:text-white"
-                >
-                  取消
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCreateProfile}
-                  disabled={!npId || !npName}
-                  className="rounded-md bg-white px-2.5 py-1 font-pixel text-[10px] tracking-[0.18em] text-black disabled:opacity-30"
-                >
-                  创建
-                </button>
+              {npErr && <p className="mt-2 font-mono text-[11px] text-rose-400">{npErr}</p>}
+              <div className="mt-2 flex justify-end gap-2">
+                <TinyBtn onClick={() => setNewProfileOpen(false)}>取消</TinyBtn>
+                <TinyBtn solid disabled={!npId || !npName} onClick={handleCreateProfile}>创建</TinyBtn>
               </div>
             </div>
           )}
-
-          <div className="mt-3 space-y-1.5">
-            {profiles.length === 0 && <p className="font-mono text-[12px] text-white/35">加载中…</p>}
+          <div className="flex flex-col gap-1">
             {profiles.map(p => {
               const isActive = p.id === active
               return (
@@ -167,182 +145,215 @@ export function SettingsView({ open, onClose }: Props) {
                   key={p.id}
                   type="button"
                   onClick={() => !isActive && switchProfile(p.id)}
-                  className={clsx(
-                    "flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors",
+                  className="flex items-center justify-between rounded-md border px-3 py-2 text-left transition-colors"
+                  style={
                     isActive
-                      ? "border-[#29ffb8]/40 bg-[#29ffb8]/10"
-                      : "border-white/8 bg-white/[0.02] hover:bg-white/[0.05]",
-                  )}
+                      ? { borderColor: "color-mix(in srgb, var(--accent) 45%, transparent)", background: "var(--accent-soft)" }
+                      : { borderColor: "rgba(255,255,255,0.08)" }
+                  }
                 >
                   <div className="flex items-center gap-2.5">
-                    <span className="grid h-7 w-7 place-items-center rounded-full bg-black/40 text-base">
-                      {p.avatar ?? "👤"}
-                    </span>
+                    <span className="text-base">{p.avatar ?? "👤"}</span>
                     <div>
-                      <div className="font-pixel text-[13px] tracking-[0.06em] text-white">
-                        {p.name}
-                      </div>
-                      <div className="font-mono text-[10px] text-white/40">
+                      <div className="font-mono text-[12px] text-white/90 light:text-black/85">{p.name}</div>
+                      <div className="font-mono text-[9px] tracking-[0.12em] text-white/35 light:text-black/40">
                         {p.id} · {p.corpus_dir}/
                       </div>
                     </div>
                   </div>
-                  {isActive && <Check size={14} className="text-[#29ffb8]" />}
+                  {isActive && <Check size={13} style={{ color: ACCENT }} />}
                 </button>
               )
             })}
           </div>
-        </section>
+        </Section>
 
         {/* Server status */}
-        <section className="mb-5 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-          <h3 className="font-pixel text-[12px] tracking-[0.22em] text-white/55">服务器状态</h3>
-          <div className="mt-3 grid grid-cols-2 gap-y-2 text-[13px]">
+        <Section title="服务器状态 · STATUS">
+          <div className="grid grid-cols-2 gap-y-1.5">
             <Row label="WebSocket" value={connected ? "connected" : "offline"} ok={connected} />
-            <Row label="Claude CLI" value={health?.claude ? "ok" : "unavailable (fallback)"} ok={!!health?.claude} />
+            <Row label="Claude CLI" value={health?.claude ? "ok" : "fallback"} ok={!!health?.claude} />
             <Row label="网易云" value="ok" ok />
             <Row
               label="TTS"
-              value={
-                health?.ttsProvider === "mimo"
-                  ? "Xiaomi MiMo V2.5"
-                  : health?.ttsProvider === "fish"
-                  ? "Fish Audio"
-                  : "silent fallback"
-              }
+              value={health?.ttsProvider === "mimo" ? "Xiaomi MiMo" : health?.ttsProvider === "fish" ? "Fish Audio" : "silent"}
               ok={health?.ttsProvider === "mimo" || health?.ttsProvider === "fish"}
             />
-            <Row label="天气" value={health?.weather ? "open-meteo ok" : "—"} ok={!!health?.weather} />
-            <Row label="飞书日历" value={health?.calendar ? "linked" : "not configured"} ok={!!health?.calendar} />
-            <Row label="Naim 客厅" value={health?.naim ? "pushed" : "not configured"} ok={!!health?.naim} />
-            <Row label="Active profile" value={active} ok />
+            <Row label="天气" value={health?.weather ? "open-meteo" : "—"} ok={!!health?.weather} />
+            <Row label="飞书日历" value={health?.calendar ? "linked" : "—"} ok={!!health?.calendar} />
+            <Row label="Naim 客厅" value={health?.naim ? "pushed" : "—"} ok={!!health?.naim} />
+            <Row label="Profile" value={active} ok />
           </div>
-        </section>
+        </Section>
 
-        {/* Theme */}
-        <section className="mb-5 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-pixel text-[12px] tracking-[0.22em] text-white/55">主题</h3>
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="rounded-full border border-white/10 px-3 py-1 font-pixel text-[11px] tracking-[0.22em] text-white/85 transition-colors hover:bg-white/8"
-            >
-              {theme.toUpperCase()}
-            </button>
-          </div>
-        </section>
+        {/* Today's schedule */}
+        <Section
+          title="今日编排 · SCHEDULE"
+          action={
+            <TinyBtn disabled={busy} onClick={async () => { setBusy(true); await triggerScheduled("用户在 Settings 手动触发一次播报"); setBusy(false) }}>
+              <RefreshCw size={11} className={clsx("-mt-px inline", busy && "animate-spin")} /> 广播一首
+            </TinyBtn>
+          }
+        >
+          <Schedule plan={plan} />
+        </Section>
 
-        {/* Manual trigger */}
-        <section className="mb-5 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-pixel text-[12px] tracking-[0.22em] text-white/55">手动触发</h3>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true)
-                await triggerScheduled("用户在 Settings 里手动触发了一次播报")
-                setBusy(false)
-              }}
-              className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1 font-pixel text-[11px] tracking-[0.22em] text-white/85 transition-colors hover:bg-white/8 disabled:opacity-40"
-            >
-              <RefreshCw size={11} className={busy ? "animate-spin" : ""} />
-              广播一首
-            </button>
-          </div>
-        </section>
+        {/* NCM account (real QR login) */}
+        <Section title="网易云账号 · NCM">
+          <NcmLoginPanel />
+        </Section>
 
-        {/* NCM login */}
-        <NcmLoginPanel />
-
-        {/* Taste import */}
-        <TasteImport onApplied={async () => {
-          const fresh = await refreshTaste()
-          setTaste(fresh)
-          setDrafts(Object.fromEntries(fresh.map(f => [f.name, f.body])))
-        }} />
-
-        {/* Taste editor */}
-        <section className="rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-          <h3 className="mb-2 font-pixel text-[12px] tracking-[0.22em] text-white/55">
-            品味语料（active profile <span className="text-white/80">{active}</span>）
-          </h3>
+        {/* Taste files */}
+        <Section title={`品味语料 · ${active}`}>
           {!taste ? (
-            <p className="font-mono text-[12px] text-white/40">读取中…</p>
+            <p className="font-mono text-[11px] text-white/40 light:text-black/45">读取中…</p>
           ) : taste.length === 0 ? (
-            <p className="font-mono text-[12px] text-white/40">无语料文件</p>
+            <p className="font-mono text-[11px] text-white/40 light:text-black/45">无语料文件</p>
           ) : (
-            <div className="space-y-2">
+            <div className="flex flex-col gap-1">
               {taste.map(f => {
                 const isDirty = !!dirty[f.name]
                 const isSaving = savingName === f.name
                 const justSaved = (savedAt[f.name] ?? 0) > Date.now() - 3000
                 const isOpen = openFile === f.name
                 return (
-                  <div key={f.name} className="rounded-lg bg-black/30 p-3">
+                  <div key={f.name} className="rounded-md border border-white/8 light:border-black/8">
                     <button
                       type="button"
                       onClick={() => setOpenFile(o => (o === f.name ? null : f.name))}
-                      className="flex w-full items-center justify-between"
+                      className="flex w-full items-center justify-between px-3 py-2"
                     >
-                      <span className="font-pixel text-[11px] tracking-[0.18em] text-white/85">
-                        {f.name}
-                      </span>
-                      <span className="font-mono text-[10px] text-white/35">
-                        {isDirty && !justSaved && "·未保存"}
-                        {justSaved && !isDirty && <span className="text-[#29ffb8]">·已保存</span>}
+                      <span className="font-mono text-[11px] tracking-[0.06em] text-white/85 light:text-black/80">{f.name}</span>
+                      <span className="font-mono text-[9px] tracking-[0.12em] text-white/35 light:text-black/40">
+                        {isDirty && !justSaved && "· 未保存"}
+                        {justSaved && !isDirty && <span style={{ color: ACCENT }}>· 已保存</span>}
                       </span>
                     </button>
                     {isOpen && (
-                      <>
+                      <div className="px-3 pb-3">
                         <textarea
                           value={drafts[f.name] ?? ""}
                           onChange={e => setDrafts(d => ({ ...d, [f.name]: e.target.value }))}
                           spellCheck={false}
-                          className="thin-scroll mt-2 h-56 w-full resize-y rounded-md bg-black/50 p-2 font-mono text-[12px] leading-snug text-white/85 outline-none"
+                          className="thin-scroll h-48 w-full resize-y rounded-md border border-white/10 bg-black/40 p-2 font-mono text-[11px] leading-relaxed text-white/85 outline-none light:border-black/10 light:bg-white/50 light:text-black/80"
                         />
                         <div className="mt-2 flex justify-end">
                           <button
                             type="button"
                             disabled={!isDirty || isSaving}
                             onClick={() => handleSave(f.name)}
-                            className="inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-1 font-pixel text-[10px] tracking-[0.18em] text-black disabled:opacity-30"
+                            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1 font-mono text-[10px] tracking-[0.14em] text-black disabled:opacity-30"
+                            style={{ background: ACCENT }}
                           >
-                            <Save size={11} className={isSaving ? "animate-pulse" : ""} />
-                            保存
+                            <Save size={11} className={isSaving ? "animate-pulse" : ""} /> 保存
                           </button>
                         </div>
-                      </>
+                      </div>
                     )}
                   </div>
                 )
               })}
             </div>
           )}
-        </section>
+        </Section>
       </div>
     </div>
+  )
+}
+
+function Section({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="mb-5">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="font-mono text-[10px] tracking-[0.26em] text-white/45 light:text-black/45">{title}</h3>
+        {action}
+      </div>
+      {children}
+    </section>
   )
 }
 
 function Row({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
   return (
     <>
-      <div className="font-mono text-[12px] text-white/55">{label}</div>
-      <div className="flex items-center justify-end gap-1.5 font-mono text-[12px]">
-        {ok ? <Wifi size={11} className="text-[#29ffb8]" /> : <WifiOff size={11} className="text-white/35" />}
-        <span className={ok ? "text-white/85" : "text-white/45"}>{value}</span>
+      <div className="font-mono text-[11px] text-white/55 light:text-black/55">{label}</div>
+      <div className="flex items-center justify-end gap-1.5 font-mono text-[11px]">
+        <span className="inline-block h-1 w-1 rounded-full" style={{ background: ok ? ACCENT : "rgba(255,255,255,0.25)" }} />
+        <span className={ok ? "text-white/85 light:text-black/80" : "text-white/40 light:text-black/45"}>{value}</span>
       </div>
     </>
   )
 }
 
-// Used to silence unused-import linting under tree-shake; kept for future
-// per-profile delete UI.
-void Trash2
+function TinyBtn({
+  children,
+  solid,
+  disabled,
+  onClick,
+}: {
+  children: React.ReactNode
+  solid?: boolean
+  disabled?: boolean
+  onClick?: () => void
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={clsx(
+        "inline-flex items-center gap-1.5 rounded-md px-3 py-1 font-mono text-[10px] tracking-[0.14em] transition-colors disabled:opacity-30",
+        solid ? "text-black" : "border border-white/12 text-white/85 hover:bg-white/8 light:border-black/15 light:text-black/80 light:hover:bg-black/8",
+      )}
+      style={solid ? { background: ACCENT } : undefined}
+    >
+      {children}
+    </button>
+  )
+}
 
-// ---- NCM login panel ------------------------------------------------------
+/** Render the day plan defensively — the scheduler's stored shape is loose. */
+function Schedule({ plan }: { plan: unknown }) {
+  if (!plan || (Array.isArray(plan) && plan.length === 0)) {
+    return <p className="font-mono text-[11px] text-white/40 light:text-black/45">今天还没编排 —— Claudio 会按时段排。</p>
+  }
+  const blocks = Array.isArray(plan) ? plan : (plan as { blocks?: unknown[] }).blocks
+  if (Array.isArray(blocks)) {
+    return (
+      <div className="flex flex-col gap-3">
+        {blocks.map((b: any, i) => (
+          <div key={i}>
+            <div className="flex items-baseline gap-2">
+              <span className="font-mono text-[10px] tracking-[0.12em]" style={{ color: ACCENT }}>
+                ▸ {b.range ?? b.time ?? ""}
+              </span>
+              <span className="font-mono text-[11px] text-white/85 light:text-black/80">{b.label ?? b.vibe ?? ""}</span>
+              {b.device && (
+                <span className="ml-auto font-mono text-[9px] tracking-[0.16em] text-white/30 light:text-black/40">{b.device}</span>
+              )}
+            </div>
+            {Array.isArray(b.tracks) && (
+              <ul className="mt-1 space-y-0.5 pl-3">
+                {b.tracks.map((t: any, j: number) => (
+                  <li key={j} className="font-mono text-[11px] leading-relaxed text-white/50 light:text-black/55">
+                    · {typeof t === "string" ? t : `${t.title ?? ""}${t.artist ? ` · ${t.artist}` : ""}`}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+    )
+  }
+  return (
+    <pre className="thin-scroll max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-[10.5px] leading-relaxed text-white/55 light:text-black/55">
+      {JSON.stringify(plan, null, 2)}
+    </pre>
+  )
+}
+
+// ---- NCM login panel (real QR polling) ------------------------------------
 
 function NcmLoginPanel() {
   const [status, setStatus] = useState<Awaited<ReturnType<typeof api.ncmStatus>> | null>(null)
@@ -353,10 +364,8 @@ function NcmLoginPanel() {
   const refresh = async () => {
     try { setStatus(await api.ncmStatus()) } catch {}
   }
-
   useEffect(() => { refresh() }, [])
 
-  // Poll QR check while scanning
   useEffect(() => {
     if (phase !== "scanning" && phase !== "scanned") return
     if (!qr) return
@@ -365,12 +374,7 @@ function NcmLoginPanel() {
       try {
         const r = await api.ncmQrCheck(qr.key)
         if (cancelled) return
-        if (r.status === "success") {
-          setPhase("success")
-          setQr(null)
-          await refresh()
-          return
-        }
+        if (r.status === "success") { setPhase("success"); setQr(null); await refresh(); return }
         if (r.status === "scanned") setPhase("scanned")
         if (r.status === "expired") { setPhase("expired"); setQr(null); return }
         if (r.status === "error") { setPhase("error"); setErrMsg(r.message ?? "未知错误"); return }
@@ -386,245 +390,60 @@ function NcmLoginPanel() {
   }, [phase, qr])
 
   const startLogin = async () => {
-    setErrMsg(null)
-    setPhase("idle")
+    setErrMsg(null); setPhase("idle")
     try {
       const r = await api.ncmQrCreate()
-      setQr(r)
-      setPhase("scanning")
+      setQr(r); setPhase("scanning")
     } catch (err) {
-      setPhase("error")
-      setErrMsg((err as Error).message)
+      setPhase("error"); setErrMsg((err as Error).message)
     }
   }
-
   const logout = async () => {
-    await api.ncmLogout()
-    setQr(null)
-    setPhase("idle")
-    await refresh()
+    await api.ncmLogout(); setQr(null); setPhase("idle"); await refresh()
   }
 
   return (
-    <section className="mb-5 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-pixel text-[12px] tracking-[0.22em] text-white/55">网易云账号</h3>
+    <div>
+      <div className="mb-2 flex justify-end">
         {status?.loggedIn ? (
-          <button
-            type="button"
-            onClick={logout}
-            className="rounded-full border border-white/10 px-3 py-1 font-pixel text-[10px] tracking-[0.18em] text-white/70 hover:bg-white/8"
-          >
-            退出
-          </button>
+          <TinyBtn onClick={logout}>退出</TinyBtn>
         ) : (
-          <button
-            type="button"
-            onClick={startLogin}
-            className="rounded-full border border-white/10 px-3 py-1 font-pixel text-[10px] tracking-[0.18em] text-white/85 hover:bg-white/8"
-          >
-            扫码登录
-          </button>
+          <TinyBtn onClick={startLogin}>扫码登录</TinyBtn>
         )}
       </div>
-
       {status?.loggedIn ? (
-        <div className="mt-3 flex items-center gap-3 rounded-lg bg-black/30 p-3">
-          <span className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-rose-500/40 to-orange-400/30 font-pixel text-[12px] text-white">
+        <div className="flex items-center gap-3 rounded-md border border-white/8 px-3 py-2.5 light:border-black/8">
+          <span className="grid h-8 w-8 place-items-center rounded-full font-mono text-[12px] text-black" style={{ background: ACCENT }}>
             {(status.nickname ?? "?").slice(0, 1).toUpperCase()}
           </span>
           <div className="min-w-0 flex-1">
-            <div className="truncate font-pixel text-[13px] tracking-[0.04em] text-white">
-              {status.nickname ?? "（已登录）"}
-            </div>
-            <div className="font-mono text-[10px] text-white/40">
-              uid {status.userId} · {status.vip ? `VIP（type ${status.vipType}）— 完整音频可解锁` : "无 VIP — 仅试听 30s"}
+            <div className="truncate font-mono text-[12px] text-white/90 light:text-black/85">{status.nickname ?? "（已登录）"}</div>
+            <div className="font-mono text-[9.5px] text-white/40 light:text-black/45">
+              uid {status.userId} · {status.vip ? `VIP（type ${status.vipType}）— 完整音频` : "无 VIP — 仅试听 30s"}
             </div>
           </div>
         </div>
       ) : qr ? (
-        <div className="mt-3 flex flex-col items-center gap-2 rounded-lg bg-black/30 p-4">
+        <div className="flex flex-col items-center gap-2 rounded-md border border-white/8 p-4 light:border-black/8">
           <img src={qr.qrimg} alt="NCM 登录二维码" className="h-44 w-44 rounded-md bg-white p-2" />
-          <div className="font-pixel text-[11px] tracking-[0.18em] text-white/70">
+          <div className="font-mono text-[11px] tracking-[0.12em] text-white/70 light:text-black/65">
             {phase === "scanning" && "等待扫码…"}
             {phase === "scanned" && "已扫码，请在手机上确认"}
-            {phase === "expired" && (
-              <button onClick={startLogin} className="text-[#29ffb8] hover:underline">二维码过期，点击重试</button>
-            )}
+            {phase === "expired" && <button onClick={startLogin} style={{ color: ACCENT }} className="hover:underline">二维码过期，点击重试</button>}
             {phase === "error" && <span className="text-rose-400">错误：{errMsg}</span>}
           </div>
-          <div className="text-center font-mono text-[10px] leading-snug text-white/35">
-            打开网易云音乐 App → 「我的」 → 右上角扫一扫
-            <br />
-            登录后所有歌返回 320kbps 完整音频（前提是你账号是 VIP）
+          <div className="text-center font-mono text-[10px] leading-relaxed text-white/35 light:text-black/45">
+            打开网易云音乐 App → 「我的」 → 右上角扫一扫<br />
+            登录后所有歌返回 320kbps 完整音频（前提你账号是 VIP）
           </div>
         </div>
-      ) : phase === "expired" ? (
-        <p className="mt-3 font-mono text-[12px] text-white/45">二维码过期，重新「扫码登录」。</p>
       ) : phase === "error" ? (
-        <p className="mt-3 font-mono text-[12px] text-rose-400">错误：{errMsg}</p>
+        <p className="font-mono text-[11px] text-rose-400">错误：{errMsg}</p>
       ) : (
-        <p className="mt-3 font-mono text-[12px] text-white/45">
-          未登录时所有带版权的歌只返回 30 秒试听。登录后能拿完整音频（前提：你账号是 VIP）。
+        <p className="font-mono text-[11px] leading-relaxed text-white/45 light:text-black/50">
+          未登录只返回 30 秒试听。登录后能拿完整音频（前提：账号是 VIP）。
         </p>
       )}
-    </section>
-  )
-}
-
-function TasteImport({ onApplied }: { onApplied: () => Promise<void> }) {
-  const [paste, setPaste] = useState("")
-  const [analyzing, setAnalyzing] = useState(false)
-  const [applying, setApplying] = useState(false)
-  const [proposal, setProposal] = useState<TasteProposal | null>(null)
-  const [err, setErr] = useState<string | null>(null)
-  const [appliedAt, setAppliedAt] = useState<number | null>(null)
-
-  const analyze = async () => {
-    setErr(null)
-    setProposal(null)
-    if (paste.trim().length < 4) {
-      setErr("先粘几首歌进来再让 Claude 分析吧")
-      return
-    }
-    setAnalyzing(true)
-    try {
-      const r = await api.analyzeTaste(paste)
-      if (r.error) throw new Error(r.error)
-      setProposal(r.proposal ?? null)
-    } catch (e) {
-      setErr((e as Error).message)
-    } finally {
-      setAnalyzing(false)
-    }
-  }
-
-  const apply = async () => {
-    if (!proposal) return
-    setApplying(true)
-    setErr(null)
-    try {
-      const r = await api.applyTaste({
-        taste_md: proposal.taste_md,
-        playlists_json: proposal.playlists_json,
-      })
-      if (!r.ok) throw new Error(r.error ?? "apply failed")
-      setAppliedAt(Date.now())
-      await onApplied()
-      // Clear after a beat so user sees the "已应用" state
-      window.setTimeout(() => {
-        setProposal(null)
-        setPaste("")
-        setAppliedAt(null)
-      }, 2500)
-    } catch (e) {
-      setErr((e as Error).message)
-    } finally {
-      setApplying(false)
-    }
-  }
-
-  return (
-    <section className="mb-5 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-pixel text-[12px] tracking-[0.22em] text-white/55">从汽水音乐导入</h3>
-        <span className="font-mono text-[10px] text-white/35">paste → Claude → propose</span>
-      </div>
-      <p className="mt-1 font-mono text-[11px] leading-snug text-white/40">
-        把你最近在汽水里听的歌粘进来（截屏 OCR / 列表 / 一行一首 都行），
-        Claude 会对照现有 taste.md / playlists.json 给出改写提案，你确认后才落盘。
-      </p>
-      <textarea
-        value={paste}
-        onChange={e => setPaste(e.target.value)}
-        spellCheck={false}
-        placeholder={`粘进来就行。例：\n- Plastic Love · Mariya Takeuchi\n- 起风了 · 买辣椒也用券\n- Says · Nils Frahm\n...`}
-        className="thin-scroll mt-2 h-40 w-full resize-y rounded-md bg-black/50 p-2 font-mono text-[12px] leading-snug text-white/85 outline-none placeholder:text-white/25"
-      />
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <div className="font-mono text-[11px] text-white/40">{paste.length} 字符</div>
-        <div className="flex gap-2">
-          {proposal && (
-            <button
-              type="button"
-              onClick={() => setProposal(null)}
-              className="rounded-md px-2.5 py-1 font-pixel text-[10px] tracking-[0.18em] text-white/55 hover:text-white"
-            >
-              丢弃提案
-            </button>
-          )}
-          <button
-            type="button"
-            disabled={analyzing || !paste.trim()}
-            onClick={analyze}
-            className="inline-flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1 font-pixel text-[10px] tracking-[0.18em] text-white hover:bg-white/8 disabled:opacity-30"
-          >
-            <Sparkles size={11} className={analyzing ? "animate-pulse" : ""} />
-            {analyzing ? "Claude 分析中…" : "Claude 分析"}
-          </button>
-        </div>
-      </div>
-      {err && <p className="mt-2 font-mono text-[11px] text-rose-400">{err}</p>}
-
-      {proposal && (
-        <div className="mt-3 space-y-2 rounded-xl bg-black/40 p-3">
-          <div>
-            <h4 className="font-pixel text-[11px] tracking-[0.18em] text-[#29ffb8]">分析摘要</h4>
-            <p className="mt-1 font-serif text-[13px] leading-snug text-white/90">
-              {proposal.summary || "(no summary)"}
-            </p>
-          </div>
-          <div>
-            <h4 className="font-pixel text-[11px] tracking-[0.18em] text-white/55">
-              抽到 {proposal.detected_tracks.length} 首
-            </h4>
-            <div className="thin-scroll mt-1 max-h-32 overflow-y-auto font-mono text-[11px] leading-snug text-white/70">
-              {proposal.detected_tracks.length === 0 ? (
-                <p className="text-white/40">没抽到歌（贴的内容里只有零散关键词？）</p>
-              ) : (
-                proposal.detected_tracks.map((t, i) => (
-                  <div key={i}>
-                    {t.title}
-                    {t.artist && <span className="text-white/40"> · {t.artist}</span>}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-          <details className="rounded-md bg-white/[0.03] p-2">
-            <summary className="cursor-pointer font-pixel text-[10px] tracking-[0.18em] text-white/55 marker:text-white/30">
-              查看新 taste.md（{proposal.taste_md?.length ?? 0} 字符）
-            </summary>
-            <pre className="thin-scroll mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-snug text-white/80">
-              {proposal.taste_md ?? "(unchanged)"}
-            </pre>
-          </details>
-          <details className="rounded-md bg-white/[0.03] p-2">
-            <summary className="cursor-pointer font-pixel text-[10px] tracking-[0.18em] text-white/55 marker:text-white/30">
-              查看新 playlists.json
-            </summary>
-            <pre className="thin-scroll mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-snug text-white/80">
-              {proposal.playlists_json
-                ? JSON.stringify(proposal.playlists_json, null, 2)
-                : "(unchanged)"}
-            </pre>
-          </details>
-          <div className="flex items-center justify-end gap-2 pt-1">
-            {appliedAt && (
-              <span className="font-mono text-[11px] text-[#29ffb8]">已应用 ✓</span>
-            )}
-            <button
-              type="button"
-              disabled={applying || !!appliedAt}
-              onClick={apply}
-              className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 font-pixel text-[10px] tracking-[0.18em] text-black hover:scale-[1.02] disabled:opacity-30"
-            >
-              {applying ? "写入中…" : "应用到当前 profile"}
-              <ArrowRight size={11} />
-            </button>
-          </div>
-        </div>
-      )}
-    </section>
+    </div>
   )
 }

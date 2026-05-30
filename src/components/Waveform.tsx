@@ -101,7 +101,15 @@ export function Waveform({ playing, bars = 14, height = 18, color }: Props) {
 /**
  * Tall waveform used in the focus view. Same logic, more bars across the row.
  */
-export function WaveformBig({ playing, color }: { playing: boolean; color?: string }) {
+export function WaveformBig({
+  playing,
+  color,
+  height = 60,
+}: {
+  playing: boolean
+  color?: string
+  height?: number
+}) {
   const { analyserRef } = usePlayer()
   const ref = useRef<HTMLCanvasElement>(null)
   const raf = useRef<number | null>(null)
@@ -114,7 +122,7 @@ export function WaveformBig({ playing, color }: { playing: boolean; color?: stri
     const canvas = ref.current
     if (!canvas) return
     const dpr = Math.min(2, window.devicePixelRatio || 1)
-    const cssH = 60
+    const cssH = height
     const setSize = (cssW: number) => {
       canvas.width = cssW * dpr
       canvas.height = cssH * dpr
@@ -167,7 +175,7 @@ export function WaveformBig({ playing, color }: { playing: boolean; color?: stri
       if (raf.current != null) cancelAnimationFrame(raf.current)
       ro.disconnect()
     }
-  }, [analyserRef, color, playing])
+  }, [analyserRef, color, playing, height])
 
   return <canvas ref={ref} className="block w-full" />
 }

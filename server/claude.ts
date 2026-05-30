@@ -1,6 +1,13 @@
 import { spawn } from "node:child_process"
+import { tmpdir } from "node:os"
 
 const CLAUDE_BIN = process.env.CLAUDE_BIN || "claude"
+
+// Run headless `claude -p` calls from a neutral directory so they DON'T pick up
+// this repo's CLAUDE.md / .claude/settings.json (e.g. the SDD doc-sync Stop
+// hook). The DJ prompt is fully self-contained; repo context only pollutes it
+// (the model would otherwise reply about TODO.md instead of emitting DJ JSON).
+const ISOLATED_CWD = tmpdir()
 
 export type DJOutput = {
   say: string
@@ -32,6 +39,7 @@ export async function askDJ(systemPrompt: string, userPrompt: string): Promise<D
     const proc = spawn(CLAUDE_BIN, args, {
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env },
+      cwd: ISOLATED_CWD,
     })
 
     let stdout = ""

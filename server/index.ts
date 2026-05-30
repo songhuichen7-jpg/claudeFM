@@ -1,3 +1,4 @@
+import "./env.js" // must be first — loads .env before tts.ts etc. read process.env
 import Fastify from "fastify"
 import fastifyWebsocket from "@fastify/websocket"
 import fastifyStatic from "@fastify/static"
