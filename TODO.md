@@ -27,6 +27,6 @@
 
 ## C. 收尾
 
-- [ ] C1. `pnpm build` 通过；本地 `pnpm dev` 起真实栈，手动过 PRD §3 八条旅程（四态）。
-- [ ] C2. E2E：`tests/e2e/` Playwright 覆盖核心旅程，全绿。
-- [ ] C3. 回填 `ARCHITECTURE.md` 实际目录；提交 + push。
+- [x] C1. `pnpm build` 通过；本地 `pnpm dev` 起真实栈，手动过 PRD §3 八条旅程（四态）。
+- [x] C2. E2E：`tests/e2e/` Playwright 覆盖核心旅程，全绿。
+- [x] C3. 回填 `ARCHITECTURE.md` 实际目录；提交 + push。

@@ -13,7 +13,8 @@
     "build": "pnpm build:web",
     "start": "node --import tsx server/index.ts",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "e2e": "playwright test"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -38,6 +39,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "1.59.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.12.3",
     "@types/node-cron": "^3.0.11",

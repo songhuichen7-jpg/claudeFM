@@ -32,3 +32,10 @@ cache/
 # Personal profile data
 user/
 user.night/
+
+# Playwright
+test-results/
+playwright-report/
+
+# Secrets
+.env
