@@ -1,52 +1,35 @@
 import { clsx } from "clsx"
+import type { CSSProperties } from "react"
 
 /**
- * Pixel-art tabby cat avatar — used in Header (small) and ProfileCard (big).
- * Constructed from <rect> pixels so it scales crisply at any size via SVG.
+ * Claudio's video-reference avatar, reused in Header, Focus, Profile, and chat.
  */
 export function CatAvatar({
   size = 28,
+  mobileSize,
   className,
 }: {
   size?: number
+  mobileSize?: number
   className?: string
 }) {
   return (
     <div
-      className={clsx("relative shrink-0 overflow-hidden rounded-full", className)}
-      style={{ width: size, height: size }}
+      className={clsx(
+        "relative h-[var(--avatar-size)] w-[var(--avatar-size)] shrink-0 overflow-hidden rounded-full max-sm:h-[var(--avatar-mobile-size)] max-sm:w-[var(--avatar-mobile-size)]",
+        className,
+      )}
+      style={{
+        "--avatar-size": `${size}px`,
+        "--avatar-mobile-size": `${mobileSize ?? size}px`,
+      } as CSSProperties}
     >
-      <svg viewBox="0 0 16 16" className="absolute inset-0 h-full w-full" shapeRendering="crispEdges">
-        {/* background */}
-        <rect width="16" height="16" fill="#1d141d" />
-        {/* sky gradient feel */}
-        <rect x="0" y="0" width="16" height="6" fill="#2a1d2c" />
-        <rect x="0" y="6" width="16" height="4" fill="#3a2738" />
-        {/* ears */}
-        <rect x="3" y="3" width="2" height="2" fill="#d99b62" />
-        <rect x="11" y="3" width="2" height="2" fill="#d99b62" />
-        <rect x="4" y="3" width="1" height="1" fill="#7a4c2a" />
-        <rect x="11" y="3" width="1" height="1" fill="#7a4c2a" />
-        {/* head */}
-        <rect x="3" y="5" width="10" height="6" fill="#e6a86a" />
-        <rect x="3" y="11" width="10" height="2" fill="#d99b62" />
-        {/* stripes */}
-        <rect x="5" y="5" width="1" height="2" fill="#b87f47" />
-        <rect x="8" y="5" width="1" height="2" fill="#b87f47" />
-        <rect x="10" y="5" width="1" height="2" fill="#b87f47" />
-        {/* eyes */}
-        <rect x="5" y="8" width="2" height="2" fill="#1d141d" />
-        <rect x="9" y="8" width="2" height="2" fill="#1d141d" />
-        <rect x="6" y="8" width="1" height="1" fill="#7ad7c8" />
-        <rect x="10" y="8" width="1" height="1" fill="#7ad7c8" />
-        {/* nose */}
-        <rect x="7" y="10" width="2" height="1" fill="#ad5d4a" />
-        {/* mouth */}
-        <rect x="6" y="11" width="1" height="1" fill="#7a4c2a" />
-        <rect x="9" y="11" width="1" height="1" fill="#7a4c2a" />
-        {/* body hint */}
-        <rect x="3" y="13" width="10" height="3" fill="#3a2738" />
-      </svg>
+      <img
+        src="/claudio-avatar.png"
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover"
+        draggable={false}
+      />
     </div>
   )
 }

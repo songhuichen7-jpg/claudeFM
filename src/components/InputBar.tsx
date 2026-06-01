@@ -19,10 +19,13 @@ export function InputBar() {
   }
 
   return (
-    <div className="px-4 pt-2 pb-2.5 sm:px-5">
+    <div className="relative z-10 border-t border-white/8 bg-black/32 px-5 pb-2 pt-2 sm:px-8 light:border-black/10 light:bg-white/24">
       <div
-        className="flex items-center gap-2 rounded-lg border bg-white/[0.02] px-2.5 py-1.5 transition-colors light:bg-black/[0.02]"
-        style={{ borderColor: focused ? "var(--accent)" : "rgba(255,255,255,0.10)" }}
+        className="flex items-center gap-2 rounded-[13px] border bg-black/42 px-3 py-1 transition-[background-color,border-color,box-shadow] duration-150 ease-[var(--ease-out)] light:bg-white/68"
+        style={{
+          borderColor: focused ? "var(--accent)" : "rgba(255,255,255,0.10)",
+          boxShadow: focused ? "0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent)" : "none",
+        }}
       >
         <input
           value={text}
@@ -36,12 +39,12 @@ export function InputBar() {
             }
           }}
           placeholder="Say something to the DJ..."
-          className="font-mono flex-1 bg-transparent px-1.5 py-1 text-[12.5px] tracking-[0.02em] text-white/90 outline-none placeholder:text-white/30 light:text-black/85 light:placeholder:text-black/35"
+          className="min-w-0 flex-1 bg-transparent px-1 py-0.5 font-mono text-[12.5px] tracking-[0.02em] text-white/90 outline-none placeholder:text-white/30 light:text-black/85 light:placeholder:text-black/35 sm:text-[13.5px]"
           aria-label="Message DJ"
         />
         <button
           type="button"
-          className="grid h-7 w-7 place-items-center rounded-md text-white/55 transition-colors hover:bg-white/8 hover:text-white light:text-black/55 light:hover:bg-black/8 light:hover:text-black"
+          className="pressable grid h-8 w-8 shrink-0 place-items-center rounded-full border border-white/10 text-white/55 hover:border-white/18 hover:bg-white/8 hover:text-white light:border-black/10 light:text-black/55 light:hover:bg-black/8 light:hover:text-black"
           aria-label="Voice"
         >
           <Mic size={14} />
@@ -50,29 +53,13 @@ export function InputBar() {
           type="button"
           onClick={submit}
           disabled={!text.trim()}
-          className="grid h-7 w-7 place-items-center rounded-md transition-transform active:scale-95 disabled:opacity-30"
+          className="pressable grid h-8 w-8 shrink-0 place-items-center rounded-full disabled:opacity-30"
           style={{ background: text.trim() ? "var(--accent)" : "rgba(255,255,255,0.08)", color: text.trim() ? "#04140d" : "rgba(255,255,255,0.5)" }}
           aria-label="Send"
         >
           <ArrowUp size={14} strokeWidth={2.6} />
         </button>
       </div>
-    </div>
-  )
-}
-
-export function Footer() {
-  const { connected } = usePlayer()
-  return (
-    <div className="flex items-center justify-between px-5 pb-3 pt-0.5 font-mono text-[9px] tracking-[0.32em] text-white/25 light:text-black/35">
-      <span>CLAUDIO FM</span>
-      <span className="inline-flex items-center gap-1.5">
-        <span
-          className="inline-block h-1 w-1 rounded-full"
-          style={{ background: connected ? "var(--accent)" : "rgba(255,255,255,0.25)" }}
-        />
-        {connected ? "CONNECTED" : "OFFLINE"}
-      </span>
     </div>
   )
 }

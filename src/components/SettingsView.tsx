@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Check, Plus, RefreshCw, Save, X } from "lucide-react"
 import { clsx } from "clsx"
 import { usePlayer } from "../state/PlayerContext"
@@ -27,6 +27,7 @@ export function SettingsView({ open, onClose }: Props) {
   const [openFile, setOpenFile] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [plan, setPlan] = useState<unknown>(null)
+  const [ncmStatus, setNcmStatus] = useState<Awaited<ReturnType<typeof api.ncmStatus>> | null>(null)
 
   const [newProfileOpen, setNewProfileOpen] = useState(false)
   const [npId, setNpId] = useState("")
@@ -34,6 +35,23 @@ export function SettingsView({ open, onClose }: Props) {
   const [npErr, setNpErr] = useState<string | null>(null)
 
   const active = health?.activeProfile ?? "default"
+  const llmValue = health?.llm
+    ? `${health.llm.label} · ${health.llm.model}`
+    : "fallback"
+  const ncmValue = ncmStatus
+    ? ncmStatus.loggedIn
+      ? `${ncmStatus.nickname ?? "已登录"} · ${ncmStatus.vip ? `VIP ${ncmStatus.vipType ?? ""}` : "no VIP"}`
+      : "not logged in"
+    : "checking"
+  const ncmOk = !!ncmStatus?.loggedIn && !!ncmStatus.vip
+
+  const refreshNcmStatus = useCallback(async () => {
+    try {
+      setNcmStatus(await api.ncmStatus())
+    } catch {
+      setNcmStatus({ loggedIn: false })
+    }
+  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -44,8 +62,9 @@ export function SettingsView({ open, onClose }: Props) {
       })
       .catch(() => setTaste([]))
     refreshProfiles()
+    refreshNcmStatus()
     api.planToday().then(r => setPlan(r.plan)).catch(() => setPlan(null))
-  }, [open, refreshTaste, refreshProfiles, active])
+  }, [open, refreshTaste, refreshProfiles, refreshNcmStatus, active])
 
   useEffect(() => {
     if (!open) return
@@ -91,14 +110,14 @@ export function SettingsView({ open, onClose }: Props) {
   }
 
   return (
-    <div className="absolute inset-0 z-40 flex flex-col bg-[#060607]/97 backdrop-blur-sm light:bg-[#f4f1ea]/97">
+    <div className="surface-enter absolute inset-0 z-40 flex flex-col bg-[#060607]/97 backdrop-blur-sm light:bg-[#f4f1ea]/97">
       <div className="flex items-center justify-between border-b border-white/8 px-5 pt-4 pb-3 light:border-black/10">
         <span className="font-pixel text-[18px] tracking-[0.04em] text-white/90 light:text-black/85">Settings</span>
         <button
           type="button"
           onClick={onClose}
           aria-label="Close settings"
-          className="grid h-7 w-7 place-items-center rounded-md text-white/55 transition-colors hover:bg-white/8 hover:text-white light:text-black/55 light:hover:bg-black/8 light:hover:text-black"
+          className="pressable grid h-7 w-7 place-items-center rounded-md text-white/55 hover:bg-white/8 hover:text-white light:text-black/55 light:hover:bg-black/8 light:hover:text-black"
         >
           <X size={15} />
         </button>
@@ -145,7 +164,7 @@ export function SettingsView({ open, onClose }: Props) {
                   key={p.id}
                   type="button"
                   onClick={() => !isActive && switchProfile(p.id)}
-                  className="flex items-center justify-between rounded-md border px-3 py-2 text-left transition-colors"
+                  className="pressable-soft flex items-center justify-between rounded-md border px-3 py-2 text-left"
                   style={
                     isActive
                       ? { borderColor: "color-mix(in srgb, var(--accent) 45%, transparent)", background: "var(--accent-soft)" }
@@ -172,8 +191,8 @@ export function SettingsView({ open, onClose }: Props) {
         <Section title="服务器状态 · STATUS">
           <div className="grid grid-cols-2 gap-y-1.5">
             <Row label="WebSocket" value={connected ? "connected" : "offline"} ok={connected} />
-            <Row label="Claude CLI" value={health?.claude ? "ok" : "fallback"} ok={!!health?.claude} />
-            <Row label="网易云" value="ok" ok />
+            <Row label="LLM" value={llmValue} ok={!!health?.llm?.available} />
+            <Row label="网易云" value={ncmValue} ok={ncmOk} />
             <Row
               label="TTS"
               value={health?.ttsProvider === "mimo" ? "Xiaomi MiMo" : health?.ttsProvider === "fish" ? "Fish Audio" : "silent"}
@@ -200,7 +219,7 @@ export function SettingsView({ open, onClose }: Props) {
 
         {/* NCM account (real QR login) */}
         <Section title="网易云账号 · NCM">
-          <NcmLoginPanel />
+          <NcmLoginPanel status={ncmStatus} refreshStatus={refreshNcmStatus} />
         </Section>
 
         {/* Taste files */}
@@ -221,7 +240,7 @@ export function SettingsView({ open, onClose }: Props) {
                     <button
                       type="button"
                       onClick={() => setOpenFile(o => (o === f.name ? null : f.name))}
-                      className="flex w-full items-center justify-between px-3 py-2"
+                      className="pressable-soft flex w-full items-center justify-between px-3 py-2"
                     >
                       <span className="font-mono text-[11px] tracking-[0.06em] text-white/85 light:text-black/80">{f.name}</span>
                       <span className="font-mono text-[9px] tracking-[0.12em] text-white/35 light:text-black/40">
@@ -242,7 +261,7 @@ export function SettingsView({ open, onClose }: Props) {
                             type="button"
                             disabled={!isDirty || isSaving}
                             onClick={() => handleSave(f.name)}
-                            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1 font-mono text-[10px] tracking-[0.14em] text-black disabled:opacity-30"
+                            className="pressable inline-flex items-center gap-1.5 rounded-md px-3 py-1 font-mono text-[10px] tracking-[0.14em] text-black disabled:opacity-30"
                             style={{ background: ACCENT }}
                           >
                             <Save size={11} className={isSaving ? "animate-pulse" : ""} /> 保存
@@ -277,9 +296,9 @@ function Row({ label, value, ok }: { label: string; value: string; ok?: boolean 
   return (
     <>
       <div className="font-mono text-[11px] text-white/55 light:text-black/55">{label}</div>
-      <div className="flex items-center justify-end gap-1.5 font-mono text-[11px]">
+      <div className="flex min-w-0 items-center justify-end gap-1.5 font-mono text-[11px]">
         <span className="inline-block h-1 w-1 rounded-full" style={{ background: ok ? ACCENT : "rgba(255,255,255,0.25)" }} />
-        <span className={ok ? "text-white/85 light:text-black/80" : "text-white/40 light:text-black/45"}>{value}</span>
+        <span className={clsx("truncate", ok ? "text-white/85 light:text-black/80" : "text-white/40 light:text-black/45")}>{value}</span>
       </div>
     </>
   )
@@ -302,7 +321,7 @@ function TinyBtn({
       disabled={disabled}
       onClick={onClick}
       className={clsx(
-        "inline-flex items-center gap-1.5 rounded-md px-3 py-1 font-mono text-[10px] tracking-[0.14em] transition-colors disabled:opacity-30",
+        "pressable inline-flex items-center gap-1.5 rounded-md px-3 py-1 font-mono text-[10px] tracking-[0.14em] disabled:opacity-30",
         solid ? "text-black" : "border border-white/12 text-white/85 hover:bg-white/8 light:border-black/15 light:text-black/80 light:hover:bg-black/8",
       )}
       style={solid ? { background: ACCENT } : undefined}
@@ -355,16 +374,17 @@ function Schedule({ plan }: { plan: unknown }) {
 
 // ---- NCM login panel (real QR polling) ------------------------------------
 
-function NcmLoginPanel() {
-  const [status, setStatus] = useState<Awaited<ReturnType<typeof api.ncmStatus>> | null>(null)
+function NcmLoginPanel({
+  status,
+  refreshStatus,
+}: {
+  status: Awaited<ReturnType<typeof api.ncmStatus>> | null
+  refreshStatus: () => Promise<void>
+}) {
   const [qr, setQr] = useState<{ key: string; qrimg: string } | null>(null)
   const [phase, setPhase] = useState<"idle" | "scanning" | "scanned" | "success" | "expired" | "error">("idle")
   const [errMsg, setErrMsg] = useState<string | null>(null)
-
-  const refresh = async () => {
-    try { setStatus(await api.ncmStatus()) } catch {}
-  }
-  useEffect(() => { refresh() }, [])
+  useEffect(() => { refreshStatus() }, [refreshStatus])
 
   useEffect(() => {
     if (phase !== "scanning" && phase !== "scanned") return
@@ -374,7 +394,7 @@ function NcmLoginPanel() {
       try {
         const r = await api.ncmQrCheck(qr.key)
         if (cancelled) return
-        if (r.status === "success") { setPhase("success"); setQr(null); await refresh(); return }
+        if (r.status === "success") { setPhase("success"); setQr(null); await refreshStatus(); return }
         if (r.status === "scanned") setPhase("scanned")
         if (r.status === "expired") { setPhase("expired"); setQr(null); return }
         if (r.status === "error") { setPhase("error"); setErrMsg(r.message ?? "未知错误"); return }
@@ -387,7 +407,7 @@ function NcmLoginPanel() {
     }
     tick()
     return () => { cancelled = true }
-  }, [phase, qr])
+  }, [phase, qr, refreshStatus])
 
   const startLogin = async () => {
     setErrMsg(null); setPhase("idle")
@@ -399,7 +419,7 @@ function NcmLoginPanel() {
     }
   }
   const logout = async () => {
-    await api.ncmLogout(); setQr(null); setPhase("idle"); await refresh()
+    await api.ncmLogout(); setQr(null); setPhase("idle"); await refreshStatus()
   }
 
   return (

@@ -9,13 +9,14 @@ import {
   type ReactNode,
 } from "react"
 import type { ChatMessage, DJMessage, Theme, Track } from "../data/types"
-import { api, serverMessagesToUI, serverTrackToUI, wordsFromText, type DJTurn, type ServerTrack } from "../api/client"
+import { api, serverMessagesToUI, serverTrackToUI, wordsFromText, type DJTurn, type LLMStatus, type ServerTrack } from "../api/client"
 
 export type Profile = { id: string; name: string; avatar: string | null; corpus_dir: string; created_at: number }
 
 type Health = {
   ok: boolean
   claude: boolean
+  llm: LLMStatus
   calendar: boolean
   naim: boolean
   weather: boolean
@@ -96,6 +97,17 @@ type PlayerState = {
 }
 
 const PlayerContext = createContext<PlayerState | null>(null)
+const TTS_MUSIC_DUCK_FACTOR = 0.32
+const TTS_VOLUME_RAMP_MS = 220
+
+function audioSrcMatchesTrack(a: HTMLAudioElement, t: Track | null) {
+  if (!t?.url) return false
+  try {
+    return a.src === new URL(t.url, window.location.href).href
+  } catch {
+    return a.src === t.url
+  }
+}
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null)
@@ -131,8 +143,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const prefetchRef = useRef<HTMLAudioElement | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const currentTrackRef = useRef<Track | null>(null)
+  const activeDJIdRef = useRef<string | null>(null)
+  const pendingTtsTurnIdRef = useRef<string | null>(null)
   const playSeqRef = useRef(0)
   const recentTracksRef = useRef<Map<string, Track>>(new Map())
+  const isPlayingRef = useRef(false)
+  const audioRecoveryRef = useRef<{ key: string; at: number } | null>(null)
+  const volumeRef = useRef(volume)
+  const musicDuckedRef = useRef(false)
+  const musicVolumeRafRef = useRef<number | null>(null)
   // One-shot permission for the next DJ turn to change playback. A user action
   // can only spend this once, so a burst of WS turns cannot cascade through
   // several songs from one prompt or one impatient click.
@@ -152,9 +171,69 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const ttsSrcRef = useRef<MediaElementAudioSourceNode | null>(null)
   const analyserRef = useRef<AnalyserHandle>({ freq: null, level: 0, isAudio: false, channel: null })
 
+  const rampMusicVolume = useCallback((ducked: boolean, immediate = false) => {
+    const a = audioRef.current
+    if (!a) return
+    const target = Math.max(0, Math.min(1, volumeRef.current * (ducked ? TTS_MUSIC_DUCK_FACTOR : 1)))
+    if (musicVolumeRafRef.current != null) {
+      window.cancelAnimationFrame(musicVolumeRafRef.current)
+      musicVolumeRafRef.current = null
+    }
+    if (immediate) {
+      a.volume = target
+      return
+    }
+    const from = a.volume
+    const started = performance.now()
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - started) / TTS_VOLUME_RAMP_MS)
+      const eased = 1 - Math.pow(1 - t, 3)
+      a.volume = from + (target - from) * eased
+      if (t < 1) {
+        musicVolumeRafRef.current = window.requestAnimationFrame(tick)
+      } else {
+        musicVolumeRafRef.current = null
+      }
+    }
+    musicVolumeRafRef.current = window.requestAnimationFrame(tick)
+  }, [])
+
+  const setTtsDucking = useCallback((ducked: boolean, immediate = false) => {
+    musicDuckedRef.current = ducked
+    rampMusicVolume(ducked, immediate)
+  }, [rampMusicVolume])
+
+  const finishTtsPlayback = useCallback(() => {
+    pendingTtsTurnIdRef.current = null
+    activeDJIdRef.current = null
+    setActiveDJId(null)
+    setTtsDucking(false)
+    const a = audioRef.current
+    setStatus(a && !a.paused ? "playing" : "idle")
+  }, [setTtsDucking])
+
+  const stopTtsPlayback = useCallback(() => {
+    const tts = ttsRef.current
+    if (tts) {
+      try {
+        tts.pause()
+        tts.currentTime = 0
+      } catch {}
+    }
+    finishTtsPlayback()
+  }, [finishTtsPlayback])
+
   useEffect(() => {
     currentTrackRef.current = currentTrack
   }, [currentTrack])
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying
+  }, [isPlaying])
+
+  useEffect(() => {
+    activeDJIdRef.current = activeDJId
+  }, [activeDJId])
 
   const applyServerMessages = useCallback((ms: Parameters<typeof serverMessagesToUI>[0]) => {
     const ui = serverMessagesToUI(ms)
@@ -163,10 +242,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       m => m.kind === "dj" && (m as DJMessage).recommends?.[0],
     ) as DJMessage | undefined
     const lastTrack = lastDj?.recommends?.[0]
+    for (const m of ui) {
+      if (m.kind !== "dj") continue
+      const dj = m as DJMessage
+      for (const t of dj.recommends ?? []) recentTracksRef.current.set(t.id, t)
+    }
     if (lastTrack && !currentTrackRef.current) {
       setCurrentTrack(lastTrack)
       currentTrackRef.current = lastTrack
-      recentTracksRef.current.set(lastTrack.id, lastTrack)
     }
     return ui
   }, [])
@@ -177,22 +260,31 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const a = new Audio()
     a.preload = "metadata"
     a.crossOrigin = "anonymous"
+    a.dataset.claudioAudio = "music"
+    a.style.display = "none"
+    document.body.appendChild(a)
     audioRef.current = a
     const tts = new Audio()
     tts.preload = "auto"
     tts.crossOrigin = "anonymous"
+    tts.dataset.claudioAudio = "tts"
+    tts.style.display = "none"
+    document.body.appendChild(tts)
     ttsRef.current = tts
     const prefetch = new Audio()
     prefetch.preload = "auto"
     prefetch.crossOrigin = "anonymous"
     prefetch.muted = true
+    prefetch.dataset.claudioAudio = "prefetch"
+    prefetch.style.display = "none"
+    document.body.appendChild(prefetch)
     prefetchRef.current = prefetch
 
     const onTime = () => setCurrentTime(a.currentTime)
     const onDur = () => setDuration(a.duration || 0)
     const onEnded = () => {
       setIsPlaying(false)
-      setStatus("idle")
+      setStatus(activeDJIdRef.current ? "speaking" : "idle")
     }
     a.addEventListener("timeupdate", onTime)
     a.addEventListener("loadedmetadata", onDur)
@@ -218,17 +310,25 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         return { ...dj, duration: realMs, words: scaled }
       }))
     }
+    const onTtsDone = () => finishTtsPlayback()
     tts.addEventListener("loadedmetadata", ttsMeta)
-    tts.addEventListener("ended", () => setStatus(s => (s === "speaking" ? "playing" : s)))
+    tts.addEventListener("ended", onTtsDone)
+    tts.addEventListener("error", onTtsDone)
 
     return () => {
       a.removeEventListener("timeupdate", onTime)
       a.removeEventListener("loadedmetadata", onDur)
       a.removeEventListener("ended", onEnded)
       tts.removeEventListener("loadedmetadata", ttsMeta)
+      tts.removeEventListener("ended", onTtsDone)
+      tts.removeEventListener("error", onTtsDone)
+      if (musicVolumeRafRef.current != null) window.cancelAnimationFrame(musicVolumeRafRef.current)
       a.pause(); tts.pause(); prefetch.pause()
+      a.remove()
+      tts.remove()
+      prefetch.remove()
     }
-  }, [])
+  }, [finishTtsPlayback])
 
   /** Lazily attach a single AudioContext + Analyser. Browsers require a user
    * gesture to "unlock" the context, so we boot it on the first play() call
@@ -311,9 +411,36 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   // Volume → element
   useEffect(() => {
-    if (audioRef.current) audioRef.current.volume = volume
+    volumeRef.current = volume
+    rampMusicVolume(musicDuckedRef.current, true)
     if (ttsRef.current) ttsRef.current.volume = volume
-  }, [volume])
+  }, [rampMusicVolume, volume])
+
+  const startTtsForTurn = useCallback((turn: Pick<DJTurn, "id" | "ttsUrl" | "ttsSilent">) => {
+    if (!ttsRef.current || !turn.ttsUrl || turn.ttsSilent) return false
+    try {
+      ensureAudioGraph()
+      const ctx = audioCtxRef.current
+      if (ctx && ctx.state === "suspended") ctx.resume().catch(() => undefined)
+      ttsRef.current.pause()
+      ttsRef.current.src = turn.ttsUrl
+      ttsRef.current.currentTime = 0
+      ttsRef.current.volume = volumeRef.current
+      pendingTtsTurnIdRef.current = null
+      setActiveDJId(turn.id)
+      activeDJIdRef.current = turn.id
+      setDjElapsedMs(0)
+      setTtsDucking(true)
+      setStatus("speaking")
+      ttsRef.current.play().catch(() => {
+        if (activeDJIdRef.current === turn.id) finishTtsPlayback()
+      })
+      return true
+    } catch {
+      finishTtsPlayback()
+      return false
+    }
+  }, [ensureAudioGraph, finishTtsPlayback, setTtsDucking])
 
   // Bootstrap: load health + recent messages
   useEffect(() => {
@@ -363,6 +490,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         try {
           const m = JSON.parse(ev.data)
           if (m.type === "dj") handleTurn(m.turn as DJTurn)
+          else if (m.type === "dj-tts") handleTtsUpdate(m.turn as DJTurn)
           else if (m.type === "now-playing" && m.track) {
             const t = serverTrackToUI(m.track as ServerTrack)
             recentTracksRef.current.set(t.id, t)
@@ -473,7 +601,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   // Load the Library on mount (declared here, after refreshLiked, to avoid TDZ).
   useEffect(() => { refreshLiked() }, [refreshLiked])
 
-  const playTrack = useCallback((t: Track) => {
+  const playTrack = useCallback((t: Track, retryResolve = true) => {
     const a = audioRef.current
     if (!a || !t.url) return
     const seq = ++playSeqRef.current
@@ -493,17 +621,117 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       a.load()
     } catch {}
     a.src = t.url
+    let playSettled = false
+    const startTimer = window.setTimeout(() => {
+      if (seq !== playSeqRef.current) return
+      if (playSettled) return
+      setStatus("idle")
+      showToast("播放没启动", "再点一次播放，或换一首试试")
+    }, 3000)
     a.play()
       .then(() => {
+        playSettled = true
+        window.clearTimeout(startTimer)
         if (seq !== playSeqRef.current) return
+        audioRecoveryRef.current = null
         setIsPlaying(true)
-        setStatus("playing")
+        setStatus(activeDJIdRef.current ? "speaking" : "playing")
       })
-      .catch(() => {
+      .catch(err => {
+        playSettled = true
+        window.clearTimeout(startTimer)
         if (seq !== playSeqRef.current) return
         setIsPlaying(false)
+        setStatus("idle")
+        if ((err as Error)?.name === "NotAllowedError") {
+          showToast("播放没启动", "再点一次播放，浏览器可能刚拦了一下")
+          return
+        }
+        if (!retryResolve) {
+          showToast("播放没启动", `${t.title} · ${t.artist}`)
+          return
+        }
+        api
+          .resolve(t.title, t.artist)
+          .then(({ track, candidate, reason }) => {
+            if (seq !== playSeqRef.current) return
+            if (!track?.url) {
+              showToast(
+                reason === "unplayable" ? "网易云暂时不能播放" : "没找到可播放版本",
+                candidate ? `${candidate.title} · ${candidate.artist}` : `${t.title} · ${t.artist}`,
+              )
+              return
+            }
+            const fresh = serverTrackToUI(track)
+            recentTracksRef.current.set(fresh.id, fresh)
+            currentTrackRef.current = fresh
+            setCurrentTrack(fresh)
+            playTrack(fresh, false)
+          })
+          .catch(() => {
+            if (seq === playSeqRef.current) showToast("播放没启动", `${t.title} · ${t.artist}`)
+          })
       })
-  }, [ensureAudioGraph])
+  }, [ensureAudioGraph, showToast])
+
+  const resolveAndPlayTrack = useCallback(async (seed: Track) => {
+    const query = `${seed.title} ${seed.artist}`.trim()
+    if (!query) return
+    setStatus("thinking")
+    try {
+      const { track, candidate, reason } = await api.resolve(seed.title, seed.artist)
+      if (!track) {
+        setStatus("idle")
+        showToast(
+          reason === "unplayable" ? "网易云暂时不能播放" : "没找到可播放版本",
+          candidate ? `${candidate.title} · ${candidate.artist}` : query,
+        )
+        return
+      }
+      const playable = serverTrackToUI(track)
+      recentTracksRef.current.set(playable.id, playable)
+      currentTrackRef.current = playable
+      setCurrentTrack(playable)
+      playTrack(playable)
+    } catch {
+      setStatus("idle")
+      showToast("网易云暂时连不上", query)
+    }
+  }, [playTrack, showToast])
+
+  const recoverAfterAudioError = useCallback(() => {
+    const a = audioRef.current
+    const t = currentTrackRef.current
+    if (!a || !t?.url) return
+    if (!isPlayingRef.current) return
+    if (!audioSrcMatchesTrack(a, t)) return
+
+    const key = `${t.id}:${t.title}:${t.artist}`
+    const now = Date.now()
+    const last = audioRecoveryRef.current
+    if (last?.key === key && now - last.at < 15_000) {
+      ++playSeqRef.current
+      a.pause()
+      setIsPlaying(false)
+      setStatus("idle")
+      showToast("播放断了", `${t.title} · ${t.artist}`)
+      return
+    }
+
+    audioRecoveryRef.current = { key, at: now }
+    ++playSeqRef.current
+    setIsPlaying(false)
+    setStatus("thinking")
+    showToast("网易云链接失效，重新拉取", `${t.title} · ${t.artist}`)
+    resolveAndPlayTrack(t).catch(() => undefined)
+  }, [resolveAndPlayTrack, showToast])
+
+  useEffect(() => {
+    const a = audioRef.current
+    if (!a) return
+    a.addEventListener("error", recoverAfterAudioError)
+    return () => a.removeEventListener("error", recoverAfterAudioError)
+  }, [recoverAfterAudioError])
 
   /** Try to put the most-likely next track in the prefetch <audio> so when
    * the user hits "next" the browser can swap with minimal stall. */
@@ -536,6 +764,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     // processed.
     if (handledTurnsRef.current.has(turn.id)) return
     handledTurnsRef.current.add(turn.id)
+    if (activeDJIdRef.current && activeDJIdRef.current !== turn.id) stopTtsPlayback()
 
     const stamp = new Date(turn.ts)
     const hhmm = `${String(stamp.getHours()).padStart(2, "0")}:${String(stamp.getMinutes()).padStart(2, "0")}`
@@ -558,8 +787,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     // action issued a one-shot autoplay ticket; scheduler/proactive turns
     // should add a chat card without stealing the current song.
     if (dj.recommends && dj.recommends.length > 0) {
+      for (const t of dj.recommends) recentTracksRef.current.set(t.id, t)
       const t = dj.recommends[0]
-      recentTracksRef.current.set(t.id, t)
       const shouldAutoPlay = turn.source !== "scheduler" && consumeAutoplayTicket()
       if (shouldAutoPlay || !currentTrackRef.current) {
         setCurrentTrack(t)
@@ -571,26 +800,42 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Start TTS + word highlight (always — DJ should be heard talking even if
-    // we don't swap the song)
-    setActiveDJId(turn.id)
-    setDjElapsedMs(0)
-    setStatus("speaking")
-    if (ttsRef.current && turn.ttsUrl && !turn.ttsSilent) {
-      try {
-        ensureAudioGraph()
-        const ctx = audioCtxRef.current
-        if (ctx && ctx.state === "suspended") ctx.resume().catch(() => undefined)
-        ttsRef.current.src = turn.ttsUrl
-        ttsRef.current.currentTime = 0
-        ttsRef.current.play().catch(() => undefined)
-      } catch {}
+    // Start word highlight only when real TTS is ready. The first server turn
+    // may carry a pending placeholder while MiMo is still synthesizing; showing
+    // fake karaoke during that gap feels jumpy when the real audio arrives.
+    if (turn.ttsPending && !turn.ttsUrl) {
+      pendingTtsTurnIdRef.current = turn.id
+      setDjElapsedMs(0)
+      if (turn.tracks.length === 0) setStatus("thinking")
+    } else {
+      pendingTtsTurnIdRef.current = null
+      if (!startTtsForTurn(turn) && turn.tracks.length === 0) {
+        setStatus("idle")
+      }
     }
 
     // Pre-warm the prefetch <audio> with the segue hint so the user's next
     // tap doesn't stall on network. /api/resolve does NOT generate a DJ turn.
     if (turn.segue) prefetchNext(turn.segue)
-  }, [consumeAutoplayTicket, ensureAudioGraph, playTrack, prefetchNext])
+  }, [consumeAutoplayTicket, playTrack, prefetchNext, startTtsForTurn, stopTtsPlayback])
+
+  const handleTtsUpdate = useCallback((turn: DJTurn) => {
+    if (!turn.ttsUrl || turn.ttsSilent) {
+      if (pendingTtsTurnIdRef.current === turn.id) {
+        pendingTtsTurnIdRef.current = null
+        const a = audioRef.current
+        setStatus(a && !a.paused ? "playing" : "idle")
+      }
+      return
+    }
+    setMessages(prev => prev.map(m => {
+      if (m.kind !== "dj" || m.id !== turn.id) return m
+      return { ...(m as DJMessage), ttsUrl: turn.ttsUrl }
+    }))
+    if (activeDJIdRef.current === turn.id || pendingTtsTurnIdRef.current === turn.id) {
+      startTtsForTurn(turn)
+    }
+  }, [startTtsForTurn])
 
   const toggleTheme = useCallback(() => setTheme(t => (t === "dark" ? "light" : "dark")), [])
   const toggleHideChat = useCallback(() => setHideChat(v => !v), [])
@@ -599,14 +844,38 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const a = audioRef.current
     if (!a) return
     if (a.paused) {
+      if (!a.src && currentTrack) {
+        showToast("正在启动播放", `${currentTrack.title} · ${currentTrack.artist}`)
+        if (currentTrack.url) playTrack(currentTrack)
+        else resolveAndPlayTrack(currentTrack).catch(() => undefined)
+        return
+      }
+      if (a.src && currentTrack && !audioSrcMatchesTrack(a, currentTrack)) {
+        showToast("正在启动播放", `${currentTrack.title} · ${currentTrack.artist}`)
+        if (currentTrack.url) playTrack(currentTrack)
+        else resolveAndPlayTrack(currentTrack).catch(() => undefined)
+        return
+      }
       if (a.src) {
         const seq = ++playSeqRef.current
+        let playSettled = false
+        const startTimer = window.setTimeout(() => {
+          if (seq !== playSeqRef.current) return
+          if (playSettled) return
+          setStatus("idle")
+          showToast("播放没启动", "再点一次播放，或换一首试试")
+        }, 3000)
         a.play()
           .then(() => {
+            playSettled = true
+            window.clearTimeout(startTimer)
             if (seq === playSeqRef.current) setIsPlaying(true)
           })
           .catch(() => {
+            playSettled = true
+            window.clearTimeout(startTimer)
             if (seq === playSeqRef.current) setIsPlaying(false)
+            if (seq === playSeqRef.current) setStatus("idle")
           })
       }
     } else {
@@ -614,26 +883,50 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       a.pause()
       setIsPlaying(false)
     }
-  }, [])
+  }, [currentTrack, playTrack, resolveAndPlayTrack, showToast])
 
   const setPlaying = useCallback((v: boolean) => {
     const a = audioRef.current
     if (!a) return
     if (v) {
+      if (!a.src && currentTrack) {
+        showToast("正在启动播放", `${currentTrack.title} · ${currentTrack.artist}`)
+        if (currentTrack.url) playTrack(currentTrack)
+        else resolveAndPlayTrack(currentTrack).catch(() => undefined)
+        return
+      }
+      if (a.src && currentTrack && !audioSrcMatchesTrack(a, currentTrack)) {
+        showToast("正在启动播放", `${currentTrack.title} · ${currentTrack.artist}`)
+        if (currentTrack.url) playTrack(currentTrack)
+        else resolveAndPlayTrack(currentTrack).catch(() => undefined)
+        return
+      }
       const seq = ++playSeqRef.current
+      let playSettled = false
+      const startTimer = window.setTimeout(() => {
+        if (seq !== playSeqRef.current) return
+        if (playSettled) return
+        setStatus("idle")
+        showToast("播放没启动", "再点一次播放，或换一首试试")
+      }, 3000)
       a.play()
         .then(() => {
+          playSettled = true
+          window.clearTimeout(startTimer)
           if (seq === playSeqRef.current) setIsPlaying(true)
         })
         .catch(() => {
+          playSettled = true
+          window.clearTimeout(startTimer)
           if (seq === playSeqRef.current) setIsPlaying(false)
+          if (seq === playSeqRef.current) setStatus("idle")
         })
     } else {
       ++playSeqRef.current
       a.pause()
       setIsPlaying(false)
     }
-  }, [])
+  }, [currentTrack, playTrack, resolveAndPlayTrack, showToast])
 
   const next = useCallback(() => {
     if (nextInFlightRef.current) {
@@ -642,6 +935,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
     nextInFlightRef.current = true
     issueAutoplayTicket()
+    stopTtsPlayback()
     setStatus("thinking")
     if (currentTrack) {
       api.skip(currentTrack.id).catch(() => undefined)
@@ -656,7 +950,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       .finally(() => {
         nextInFlightRef.current = false
       })
-  }, [addSystemMessage, currentTrack, issueAutoplayTicket])
+  }, [addSystemMessage, currentTrack, issueAutoplayTicket, stopTtsPlayback])
 
   const prev = useCallback(() => {
     const a = audioRef.current
@@ -683,9 +977,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       a.pause()
       a.currentTime = 0
     }
+    stopTtsPlayback()
     setIsPlaying(false)
     setStatus("idle")
-  }, [])
+  }, [stopTtsPlayback])
 
   const toggleLike = useCallback((trackId?: string) => {
     const id = trackId ?? currentTrack?.id
@@ -696,21 +991,19 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       (currentTrack?.id === id ? currentTrack : undefined) ??
       recentTracksRef.current.get(id) ??
       likedTracks.find(t => t.id === id)
-    setLiked(prev => {
-      const nextLiked = !prev[id]
-      api.like(id, nextLiked).catch(() => undefined)
-      if (track) {
-        if (nextLiked) {
-          showToast("记进了你的品味", `${track.title} · ${track.artist}`)
-          setLikedTracks(list => (list.some(t => t.id === id) ? list : [track, ...list]))
-        } else {
-          showToast("从品味里移除", `${track.title} · ${track.artist}`)
-          setLikedTracks(list => list.filter(t => t.id !== id))
-        }
+    const nextLiked = !liked[id]
+    api.like(id, nextLiked).catch(() => undefined)
+    if (track) {
+      if (nextLiked) {
+        showToast("记进了你的品味", `${track.title} · ${track.artist}`)
+        setLikedTracks(list => (list.some(t => t.id === id) ? list : [track, ...list]))
+      } else {
+        showToast("从品味里移除", `${track.title} · ${track.artist}`)
+        setLikedTracks(list => list.filter(t => t.id !== id))
       }
-      return { ...prev, [id]: nextLiked }
-    })
-  }, [currentTrack, likedTracks, showToast])
+    }
+    setLiked(prev => ({ ...prev, [id]: nextLiked }))
+  }, [currentTrack, liked, likedTracks, showToast])
 
   const setVolume = useCallback((v: number) => {
     setVolumeState(Math.max(0, Math.min(1, v)))
@@ -728,18 +1021,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [playTrack])
 
   const replayDJ = useCallback((id: string) => {
-    setActiveDJId(id)
-    setDjElapsedMs(0)
-    // restart TTS playback
     const dj = messages.find(m => m.id === id && m.kind === "dj") as DJMessage | undefined
-    if (ttsRef.current && dj?.ttsUrl) {
-      try {
-        ttsRef.current.src = dj.ttsUrl
-        ttsRef.current.currentTime = 0
-        ttsRef.current.play().catch(() => undefined)
-      } catch {}
-    }
-  }, [messages])
+    if (dj?.ttsUrl) startTtsForTurn({ id, ttsUrl: dj.ttsUrl, ttsSilent: false })
+  }, [messages, startTtsForTurn])
 
   const sendMessage = useCallback(async (text: string) => {
     const trimmed = text.trim()
@@ -750,10 +1034,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
     chatInFlightRef.current = true
     issueAutoplayTicket()
+    stopTtsPlayback()
     const ts = new Date()
     const hhmm = `${String(ts.getHours()).padStart(2, "0")}:${String(ts.getMinutes()).padStart(2, "0")}`
     const userId = `user-${ts.getTime()}`
-    setMessages(m => [...m, { id: userId, kind: "user", speaker: "mmguo", timestamp: hhmm, text: trimmed }])
+    setMessages(m => [...m, { id: userId, kind: "user", speaker: "veko", timestamp: hhmm, text: trimmed }])
     setStatus("thinking")
     try {
       // The server broadcasts via WS too, but we kick the request so the user
@@ -772,7 +1057,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     } finally {
       chatInFlightRef.current = false
     }
-  }, [addSystemMessage, handleTurn, issueAutoplayTicket])
+  }, [addSystemMessage, handleTurn, issueAutoplayTicket, stopTtsPlayback])
 
   const triggerScheduled = useCallback(async (reason: string) => {
     try {

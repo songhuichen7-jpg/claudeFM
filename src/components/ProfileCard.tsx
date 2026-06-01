@@ -1,19 +1,20 @@
 import { useEffect } from "react"
 import { X } from "lucide-react"
 import { CatAvatar } from "./CatAvatar"
+import { DotMatrix } from "./DotMatrix"
 
 const ACCENT = "var(--accent)"
 
 const GENRES = [
-  "JAZZ-HIPHOP",
-  "NEO-CLASSICAL",
-  "90S 华语",
-  "HIP-HOP",
-  "柴可夫斯基 & EMINEM",
-  "J-ROCK",
-  "下雨白噪音",
-  "POST-PUNK",
-  "SHIBUYA-KEI",
+  "深夜电子",
+  "SLOWED + REVERB",
+  "粤港软核",
+  "SOFT R&B",
+  "K-POP 情绪",
+  "INDIE 心碎",
+  "说唱软边缘",
+  "梦境电子",
+  "通勤节奏",
 ]
 
 type Props = { open: boolean; onClose: () => void }
@@ -36,37 +37,37 @@ export function ProfileCard({ open, onClose }: Props) {
         type="button"
         aria-label="Close profile backdrop"
         onClick={onClose}
-        className="absolute inset-0 bg-black/60 backdrop-blur-[4px]"
+        className="overlay-enter absolute inset-0 bg-black/62 backdrop-blur-[7px]"
       />
-      <div className="relative w-full max-w-[400px] overflow-hidden rounded-2xl border border-white/12 bg-[#0a0a0c]/96 px-6 pt-7 pb-6 text-white shadow-[0_30px_90px_-40px_rgba(0,0,0,0.9)] light:bg-[#faf6ec]/97 light:text-black/85 light:border-black/10">
-        <div className="dot-matrix pointer-events-none absolute inset-0 opacity-50" aria-hidden />
+	      <div className="panel-enter relative w-full max-w-[760px] overflow-hidden rounded-[28px] border border-white/12 bg-[#0a0a0c]/96 px-12 pt-16 pb-12 text-white shadow-[0_40px_120px_-36px_rgba(0,0,0,0.95)] light:border-black/10 light:bg-[#faf6ec]/97 light:text-black/85 max-sm:px-6 max-sm:pt-8 max-sm:pb-7">
+        <DotMatrix className="z-0 opacity-90" strength={1.25} />
         <button
           type="button"
           onClick={onClose}
           aria-label="Close profile card"
-          className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-md text-white/55 transition-colors hover:bg-white/8 hover:text-white light:text-black/55 light:hover:bg-black/8 light:hover:text-black"
+	          className="pressable absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-md text-white/55 hover:bg-white/8 hover:text-white light:text-black/55 light:hover:bg-black/8 light:hover:text-black"
         >
           <X size={14} />
         </button>
 
-        <div className="relative flex items-center gap-4">
-          <CatAvatar size={60} className="ring-1 ring-white/15" />
+        <div className="relative flex items-center gap-8 max-sm:gap-4">
+          <CatAvatar size={92} mobileSize={64} className="ring-1 ring-white/15" />
           <div className="min-w-0">
-            <h2 className="font-pixel text-[26px] leading-none tracking-[0.04em] text-white light:text-black/85">Claudio</h2>
+            <h2 className="font-pixel text-[58px] leading-none tracking-[0.04em] text-white light:text-black/85 max-sm:text-[34px]">Claudio</h2>
             <div className="mt-2 flex items-center gap-1.5">
               <span className="live-dot inline-block h-1.5 w-1.5 rounded-full" style={{ background: ACCENT }} />
-              <span className="font-mono text-[10px] tracking-[0.2em]" style={{ color: ACCENT }}>一开机我就打碟</span>
+              <span className="font-mono text-[12px] tracking-[0.2em] max-sm:text-[10px]" style={{ color: ACCENT }}>一开机我就打碟</span>
             </div>
           </div>
         </div>
 
-        <div className="relative mt-5 space-y-1 font-mono text-[12.5px] leading-relaxed text-white/75 light:text-black/70">
-          <p>veko 的私人 dj，会打碟的 taste.md</p>
-          <p>Your mood is my prompt.</p>
-          <p>I hate algorithm. I have taste.</p>
+        <div className="relative mt-10 space-y-2 font-mono text-[20px] leading-relaxed text-white/75 light:text-black/70 max-sm:mt-6 max-sm:text-[13px]">
+          <p>veko 的私人 DJ，只读自己的 taste.md。</p>
+          <p>网易云是唱片箱，深夜和通勤都是线索。</p>
+          <p>推荐要像接歌，不像榜单。</p>
         </div>
 
-        <div className="relative my-5 h-px bg-white/8 light:bg-black/10" />
+        <div className="relative my-12 h-px bg-white/8 light:bg-black/10 max-sm:my-6" />
 
         <div className="relative grid grid-cols-3 gap-2 text-center">
           <Stat label="ON AIR" value="24/7" />
@@ -74,19 +75,19 @@ export function ProfileCard({ open, onClose }: Props) {
           <Stat label="LISTENER" value="1" />
         </div>
 
-        <div className="relative mt-5 flex flex-wrap gap-1.5">
+        <div className="relative mt-10 flex flex-wrap gap-2.5 max-sm:mt-6 max-sm:gap-1.5">
           {GENRES.map(g => (
             <span
               key={g}
-              className="rounded-md border border-white/12 px-2 py-1 font-mono text-[9.5px] tracking-[0.12em] text-white/65 light:border-black/12 light:text-black/60"
+              className="rounded-full border border-white/12 px-4 py-2 font-mono text-[14px] tracking-[0.12em] text-white/65 light:border-black/12 light:text-black/60 max-sm:px-2 max-sm:py-1 max-sm:text-[9.5px]"
             >
               {g}
             </span>
           ))}
         </div>
 
-        <div className="relative mt-5 flex items-center justify-between font-mono text-[9px] tracking-[0.28em] text-white/30 light:text-black/40">
-          <span>CLAUDE × VEKO</span>
+        <div className="relative mt-12 flex items-center justify-between font-mono text-[10px] tracking-[0.28em] text-white/30 light:text-black/40 max-sm:mt-6">
+          <span>CLAUDIO × VEKO</span>
           <span>FM</span>
         </div>
       </div>
@@ -97,8 +98,8 @@ export function ProfileCard({ open, onClose }: Props) {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="font-mono text-[9px] tracking-[0.22em] text-white/40 light:text-black/45">{label}</div>
-      <div className="mt-1 font-pixel text-[22px] leading-none text-white light:text-black/85">{value}</div>
+      <div className="font-mono text-[12px] tracking-[0.22em] text-white/40 light:text-black/45 max-sm:text-[9px]">{label}</div>
+      <div className="mt-2 font-pixel text-[34px] leading-none text-white light:text-black/85 max-sm:mt-1 max-sm:text-[22px]">{value}</div>
     </div>
   )
 }

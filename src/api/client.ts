@@ -11,11 +11,19 @@ export type ServerTrack = {
   url: string
 }
 
+export type ServerTrackCandidate = Omit<ServerTrack, "url"> & { url?: string }
+export type ResolveResponse = {
+  track: ServerTrack | null
+  candidate?: ServerTrackCandidate | null
+  reason?: "ok" | "not_found" | "unplayable"
+}
+
 export type DJTurn = {
   id: string
   say: string
   ttsUrl: string
   ttsSilent: boolean
+  ttsPending?: boolean
   source?: "user" | "scheduler" | "manual" | "next"
   reason?: string
   segue?: string
@@ -29,7 +37,16 @@ export type ServerMessage = {
   kind: "dj" | "user" | "system"
   speaker: string | null
   text: string
-  meta: { tracks?: ServerTrack[]; ttsUrl?: string; reason?: string; segue?: string } | null
+  meta: { tracks?: ServerTrack[]; ttsUrl?: string; ttsPending?: boolean; reason?: string; segue?: string } | null
+}
+
+export type LLMStatus = {
+  backend: "claude-cli" | "openai-compatible"
+  provider: "claude-cli" | "deepseek" | "openai" | "openai-compatible"
+  label: string
+  configured: boolean
+  available: boolean
+  model: string
 }
 
 const BASE = "" // same-origin (Vite proxies /api and /tts to :8080)
@@ -69,12 +86,14 @@ export type TasteProposal = {
 }
 
 export const api = {
-  health: () => jget<{ ok: boolean; claude: boolean; calendar: boolean; naim: boolean; weather: boolean; fish: boolean; mimo: boolean; ttsProvider: "mimo" | "fish" | "silent"; activeProfile: string; moodProbe: unknown }>("/api/health"),
+  health: () => jget<{ ok: boolean; claude: boolean; llm: LLMStatus; calendar: boolean; naim: boolean; weather: boolean; fish: boolean; mimo: boolean; ttsProvider: "mimo" | "fish" | "silent"; activeProfile: string; moodProbe: unknown }>("/api/health"),
   messages: () => jget<{ messages: ServerMessage[] }>("/api/messages"),
   taste: () => jget<{ files: { name: string; body: string }[]; profile: string }>("/api/taste"),
   planToday: () => jget<{ date: string; plan: unknown }>("/api/plan/today"),
   liked: () => jget<{ tracks: { id: string; title: string; artist: string; ts: number }[] }>("/api/liked"),
   next: () => jget<{ hint: string | null; plays: { track_id: string; title: string; artist: string; duration_s: number | null }[] }>("/api/next"),
+  resolve: (titleOrQuery: string, artist?: string) =>
+    jpost<ResolveResponse>("/api/resolve", artist ? { title: titleOrQuery, artist } : { query: titleOrQuery }),
   chat: (text: string) => jpost<DJTurn>("/api/chat", { text }),
   skip: (trackId: string) => jpost<{ ok: true }>("/api/skip", { trackId }),
   like: (trackId: string, liked: boolean) => jpost<{ ok: true }>("/api/like", { trackId, liked }),

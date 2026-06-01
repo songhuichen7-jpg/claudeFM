@@ -23,7 +23,7 @@ export function LibraryView({ open, onClose }: Props) {
   if (!open) return null
 
   return (
-    <div className="absolute inset-0 z-40 flex flex-col bg-[#060607]/97 backdrop-blur-sm light:bg-[#f4f1ea]/97">
+	    <div className="surface-enter absolute inset-0 z-40 flex flex-col bg-[#060607]/97 backdrop-blur-sm light:bg-[#f4f1ea]/97">
       <div className="flex items-center justify-between border-b border-white/8 px-5 pt-4 pb-3 light:border-black/10">
         <div className="flex items-baseline gap-2.5">
           <span className="font-pixel text-[18px] tracking-[0.04em] text-white/90 light:text-black/85">Library</span>
@@ -35,7 +35,7 @@ export function LibraryView({ open, onClose }: Props) {
           type="button"
           onClick={onClose}
           aria-label="Close library"
-          className="grid h-7 w-7 place-items-center rounded-md text-white/55 transition-colors hover:bg-white/8 hover:text-white light:text-black/55 light:hover:bg-black/8 light:hover:text-black"
+	          className="pressable grid h-7 w-7 place-items-center rounded-md text-white/55 hover:bg-white/8 hover:text-white light:text-black/55 light:hover:bg-black/8 light:hover:text-black"
         >
           <X size={15} />
         </button>
@@ -59,7 +59,7 @@ export function LibraryView({ open, onClose }: Props) {
               return (
                 <div
                   key={t.id}
-                  className="group flex items-center gap-3 rounded-md border border-white/8 px-3 py-2.5 transition-colors hover:border-white/20 light:border-black/8 light:hover:border-black/20"
+	                  className="group flex items-center gap-3 rounded-md border border-white/8 px-3 py-2.5 transition-[background-color,border-color] duration-150 ease-[var(--ease-out)] hover:border-white/20 light:border-black/8 light:hover:border-black/20"
                   style={isNow ? { borderColor: "color-mix(in srgb, var(--accent) 45%, transparent)", background: "var(--accent-soft)" } : undefined}
                 >
                   <span className="w-5 shrink-0 font-mono text-[10px] tabular-nums text-white/30 light:text-black/35">
@@ -69,7 +69,7 @@ export function LibraryView({ open, onClose }: Props) {
                     type="button"
                     onClick={() => { selectTrack(t); onClose() }}
                     aria-label="Play"
-                    className="text-white/55 transition-colors hover:text-white light:text-black/55 light:hover:text-black"
+	                    className="pressable text-white/55 hover:text-white light:text-black/55 light:hover:text-black"
                   >
                     <Play size={13} fill="currentColor" />
                   </button>
@@ -90,7 +90,7 @@ export function LibraryView({ open, onClose }: Props) {
                     type="button"
                     onClick={() => toggleLike(t.id)}
                     aria-label="Unlike"
-                    className="font-mono text-[15px] leading-none"
+	                    className="pressable font-mono text-[15px] leading-none"
                     style={{ color: "var(--accent)" }}
                   >
                     ♥

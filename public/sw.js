@@ -20,6 +20,7 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url)
+  if (url.origin !== self.location.origin) return
   // Pass-through for APIs and streaming endpoints
   if (
     url.pathname.startsWith("/api") ||
@@ -29,9 +30,15 @@ self.addEventListener("fetch", (event) => {
     return
   }
   if (event.request.method !== "GET") return
+  const cacheable =
+    url.pathname === "/" ||
+    url.pathname === "/index.html" ||
+    url.pathname === "/manifest.webmanifest" ||
+    url.pathname.startsWith("/assets/")
+  if (!cacheable) return
   event.respondWith(
     caches.match(event.request).then((cached) => {
-      const network = fetch(event.request)
+      const network = fetch(event.request, { cache: "no-store" })
         .then((res) => {
           // Update cache in the background
           if (res && res.status === 200) {

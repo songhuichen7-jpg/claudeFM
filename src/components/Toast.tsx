@@ -7,11 +7,11 @@ export function Toast() {
   const { toast, theme } = usePlayer()
   if (!toast) return null
   const isDark = theme === "dark"
-  return (
-    <div
-      key={toast.id}
-      className="pointer-events-none absolute bottom-20 left-1/2 z-50 -translate-x-1/2 animate-[toast-in_200ms_var(--ease-pop)]"
-    >
+	  return (
+	    <div
+	      key={toast.id}
+	      className="toast-enter pointer-events-none absolute bottom-20 left-1/2 z-50"
+	    >
       <div
         className={
           isDark
@@ -30,14 +30,8 @@ export function Toast() {
               {toast.sub}
             </span>
           )}
-        </div>
-      </div>
-      <style>{`
-        @keyframes toast-in {
-          from { opacity: 0; transform: translate(-50%, 6px); }
-          to   { opacity: 1; transform: translate(-50%, 0); }
-        }
-      `}</style>
-    </div>
-  )
-}
+	        </div>
+	      </div>
+	    </div>
+	  )
+	}

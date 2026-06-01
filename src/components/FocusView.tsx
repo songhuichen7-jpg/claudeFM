@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react"
 import { Pause, Play } from "lucide-react"
 import { usePlayer } from "../state/PlayerContext"
 import type { DJMessage } from "../data/types"
-import { WaveformBig } from "./Waveform"
+import { Waveform, WaveformBig } from "./Waveform"
 import { CatAvatar } from "./CatAvatar"
 
 const ACCENT = "#1f9e6e" // darker green so it reads on the white card
@@ -21,6 +21,8 @@ export function FocusView({ open, onClose }: Props) {
   const total = currentTrack?.duration ?? 0
   const title = currentTrack?.title ?? "—"
   const artist = currentTrack?.artist ?? "Claudio FM"
+  const speaking = !!activeDJId
+  const compact = typeof window !== "undefined" && window.innerWidth < 640
   const transcriptRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -47,57 +49,72 @@ export function FocusView({ open, onClose }: Props) {
       <Atmosphere />
       <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0" />
 
-      <div className="relative flex max-h-[94%] w-[88%] max-w-[400px] flex-col overflow-hidden rounded-[26px] bg-white text-black shadow-[0_40px_120px_-30px_rgba(0,0,0,0.8)]">
+      <div className="panel-enter relative flex max-h-[94%] w-[66vw] max-w-[708px] min-w-[320px] flex-col overflow-hidden rounded-[34px] bg-white text-black shadow-[0_44px_130px_-30px_rgba(0,0,0,0.86)] max-sm:w-[88vw]">
         {/* Dark top: header + waveform */}
-        <div className="relative bg-[#0b0b0e] px-5 pt-4 pb-3">
+        <div className="relative bg-[#08090c] px-8 pt-8 pb-0 max-sm:px-5 max-sm:pt-5">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CatAvatar size={22} className="ring-1 ring-white/20" />
-              <span className="font-pixel text-[18px] tracking-[0.04em] text-white/90">Claudio</span>
+            <div className="flex items-center gap-3">
+              <CatAvatar size={40} mobileSize={30} className="ring-1 ring-white/20" />
+              <span className="font-pixel text-[42px] leading-none tracking-[0.04em] text-white/90 max-sm:text-[28px]">Claudio</span>
             </div>
-            <span className="font-mono text-[11px] tabular-nums text-white/55">{fmt(currentTime)}</span>
+            <span className="font-mono text-[20px] tabular-nums text-white/70 max-sm:text-[13px]">{fmt(currentTime)}</span>
           </div>
-          <div className="mt-0.5 flex items-center gap-1.5">
+          <div className="mt-2 flex items-center gap-2">
             <span className="live-dot inline-block h-1.5 w-1.5 rounded-full" style={{ background: "#34e29b" }} />
-            <span className="font-mono text-[10px] tracking-[0.24em]" style={{ color: "#34e29b" }}>
-              {activeDJId ? "SPEAKING…" : "ON AIR"}
+            <span className="font-mono text-[16px] tracking-[0.02em] max-sm:text-[11px]" style={{ color: "#34e29b" }}>
+              {speaking ? "Speaking..." : "On air"}
             </span>
           </div>
-          <div className="mt-3 h-12 text-white/85">
-            <WaveformBig playing={isPlaying} color="#ffffff" height={48} />
+          <div className="mt-12 h-[150px] text-white/85 max-sm:mt-6 max-sm:h-[84px]">
+            <WaveformBig playing={isPlaying || speaking} color="#ffffff" height={compact ? 84 : 150} />
           </div>
         </div>
 
         {/* White lower half */}
-        <div className="flex min-h-0 flex-1 flex-col px-5 pt-4">
-          <h2 className="font-sans text-[30px] font-bold leading-[1.04] tracking-[-0.01em]">{title}</h2>
-          <p className="mt-1.5 font-sans text-[12.5px] text-black/45">{artist}</p>
+        <div className="focus-sheet -mt-8 flex min-h-0 flex-1 flex-col bg-white px-8 pt-10 pb-6 max-sm:-mt-5 max-sm:px-5 max-sm:pt-7 max-sm:pb-4">
+          <h2 className="font-sans text-[48px] font-bold leading-[1.04] tracking-[-0.01em] max-sm:text-[30px]">{title}</h2>
+          <p className="mt-2 font-sans text-[18px] text-black/45 max-sm:text-[12.5px]">{artist}</p>
 
-          <div className="mt-3 flex items-center gap-3">
+          <div className="mt-6 flex items-center gap-4 max-sm:mt-4 max-sm:gap-3">
             <button
               type="button"
               onClick={togglePlay}
-              className="grid h-8 w-8 place-items-center rounded-full bg-black text-white"
+              className="pressable grid h-11 w-11 place-items-center rounded-full bg-black text-white max-sm:h-8 max-sm:w-8"
               aria-label={isPlaying ? "Pause" : "Play"}
             >
               {isPlaying ? <Pause size={13} fill="currentColor" /> : <Play size={13} fill="currentColor" className="translate-x-px" />}
             </button>
-            <div className="relative h-1 flex-1">
+            <div className="relative h-2 flex-1">
               <div className="absolute inset-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-black/10" />
               <div
                 className="absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-black/70"
                 style={{ width: total ? `${(currentTime / total) * 100}%` : "0%" }}
               />
             </div>
-            <span className="font-sans text-[11px] tabular-nums text-black/40">
+            <span className="font-sans text-[16px] tabular-nums text-black/40 max-sm:text-[11px]">
               {fmt(currentTime)} / {fmt(total)}
             </span>
           </div>
 
-          <div ref={transcriptRef} className="thin-scroll relative mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto rounded-t-xl bg-black/[0.025] px-3.5 py-3.5">
+          <div ref={transcriptRef} className="focus-transcript thin-scroll relative mt-6 min-h-[210px] flex-1 space-y-5 overflow-y-auto rounded-[24px] px-6 py-6 max-sm:mt-4 max-sm:min-h-[180px] max-sm:space-y-3 max-sm:px-3.5 max-sm:py-3.5">
             {djMessages.map(dj => (
               <Line key={dj.id} dj={dj} active={activeDJId === dj.id} elapsedMs={djElapsedMs} />
             ))}
+          </div>
+
+          <div className="mt-6 flex items-center gap-4 max-sm:mt-4 max-sm:gap-2">
+            <span className="w-12 font-sans text-[17px] tabular-nums text-black/70 max-sm:w-10 max-sm:text-[12px]">{fmt(currentTime)}</span>
+            <div className="min-w-0 flex-1 overflow-hidden text-black">
+              <Waveform playing={isPlaying || speaking} bars={112} height={28} color="#111111" />
+            </div>
+            <button
+              type="button"
+              onClick={togglePlay}
+              className="pressable grid h-12 w-12 place-items-center rounded-full bg-black text-white max-sm:h-9 max-sm:w-9"
+              aria-label={isPlaying ? "Pause" : "Play"}
+            >
+              {isPlaying ? <Pause size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" className="translate-x-px" />}
+            </button>
           </div>
         </div>
       </div>

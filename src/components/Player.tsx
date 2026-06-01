@@ -8,7 +8,7 @@ type Props = { onOpenFocus?: () => void }
 
 /**
  * Mono transport bar (the prototype's PlayerBar): EQ glyph + track + state,
- * hairline icon transport, a thin progress line, then a QUEUE / N meta row.
+ * hairline icon transport, and a thin progress line.
  * Single green accent. (Historically named Player.)
  */
 export function Player({ onOpenFocus }: Props) {
@@ -28,7 +28,6 @@ export function Player({ onOpenFocus }: Props) {
     setVolume,
     seek,
     toggleHideChat,
-    upcoming,
   } = usePlayer()
 
   const total = currentTrack?.duration ?? duration ?? 0
@@ -36,24 +35,24 @@ export function Player({ onOpenFocus }: Props) {
   const isLiked = currentTrack ? !!liked[currentTrack.id] : false
 
   return (
-    <div className="border-t border-white/8 px-4 pt-3 pb-2.5 sm:px-5 light:border-black/10">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2.5">
+    <div className="relative z-10 border-y border-white/8 bg-black/22 px-7 pt-3 pb-2.5 sm:px-8 light:border-black/10 light:bg-white/18">
+      <div className="flex items-center justify-between gap-3 max-sm:flex-col max-sm:items-stretch">
+        <div className="flex min-w-0 items-center gap-2.5 max-sm:w-full">
           <button
             type="button"
             onClick={onOpenFocus}
             aria-label="Open focus view"
-            className="shrink-0"
+            className="pressable shrink-0"
           >
             <EqGlyph playing={isPlaying} />
           </button>
           <div className="min-w-0">
-            <div className="truncate font-mono text-[12.5px] tracking-[0.02em] text-white/90 light:text-black/85">
+            <div className="truncate font-mono text-[14px] tracking-[0.02em] text-white/90 light:text-black/85">
               {currentTrack?.title ?? "—"}
               <span className="mx-1 text-white/30">·</span>
               <span className="text-white/55 light:text-black/55">{currentTrack?.artist ?? "Claudio FM"}</span>
             </div>
-            <div className="font-mono text-[9px] tracking-[0.3em]" style={{ color: isPlaying ? "var(--accent)" : undefined }}>
+            <div className="mt-0.5 font-mono text-[10px] tracking-[0.3em]" style={{ color: isPlaying ? "var(--accent)" : undefined }}>
               <span className={isPlaying ? "" : "text-white/35 light:text-black/40"}>
                 {isPlaying ? "PLAYING" : currentTrack ? "PAUSED" : "STANDBY"}
               </span>
@@ -61,14 +60,14 @@ export function Player({ onOpenFocus }: Props) {
           </div>
         </div>
 
-        <div className="flex items-center gap-0.5 text-white/65 light:text-black/60">
+        <div className="flex items-center gap-1 text-white/65 light:text-black/60 max-sm:w-full max-sm:justify-between">
           <Icon label="Previous" onClick={prev}><SkipBack size={15} /></Icon>
-          <Icon label={isPlaying ? "Pause" : "Play"} onClick={togglePlay}>
+          <Icon label={isPlaying ? "Pause" : "Play"} onClick={togglePlay} dataTestId="transport-play">
             {isPlaying ? <Pause size={15} /> : <Play size={15} />}
           </Icon>
           <Icon label="Next" onClick={next}><SkipForward size={15} /></Icon>
           <Icon label="Stop" onClick={stop}><Square size={12} fill="currentColor" /></Icon>
-          <Icon label="Like" onClick={() => toggleLike()} className={clsx(isLiked && "!text-pink-400")}>
+          <Icon label="Like" onClick={() => toggleLike()} dataTestId="transport-like" className={clsx(isLiked && "!text-pink-400")}>
             <Heart size={14} fill={isLiked ? "currentColor" : "none"} />
           </Icon>
           <TextBtn onClick={toggleHideChat}>{hideChat ? "SHOW" : "HIDE"}</TextBtn>
@@ -77,7 +76,7 @@ export function Player({ onOpenFocus }: Props) {
         </div>
       </div>
 
-      <div className="mt-2.5 flex items-center gap-3">
+      <div className="mt-2 flex items-center gap-3">
         <span className="font-mono text-[10px] tabular-nums text-white/45 light:text-black/45">{fmt(currentTime)}</span>
         <button
           type="button"
@@ -95,11 +94,6 @@ export function Player({ onOpenFocus }: Props) {
           />
         </button>
         <span className="font-mono text-[10px] tabular-nums text-white/45 light:text-black/45">{fmt(total)}</span>
-      </div>
-
-      <div className="mt-2 flex items-center justify-between font-mono text-[9px] tracking-[0.3em] text-white/30 light:text-black/35">
-        <span>QUEUE</span>
-        <span>{upcoming.length} TRACKS</span>
       </div>
     </div>
   )
@@ -129,19 +123,22 @@ function Icon({
   label,
   onClick,
   className,
+  dataTestId,
 }: {
   children: React.ReactNode
   label: string
   onClick?: () => void
   className?: string
+  dataTestId?: string
 }) {
   return (
     <button
       type="button"
       aria-label={label}
+      data-testid={dataTestId}
       onClick={onClick}
       className={clsx(
-        "grid h-7 w-7 place-items-center rounded-md transition-colors hover:bg-white/8 hover:text-white light:hover:bg-black/8 light:hover:text-black",
+        "pressable grid h-8 w-8 place-items-center rounded-full border border-white/10 hover:border-white/18 hover:bg-white/8 hover:text-white light:border-black/10 light:hover:bg-black/8 light:hover:text-black",
         className,
       )}
     >
@@ -155,7 +152,7 @@ function TextBtn({ children, onClick }: { children: React.ReactNode; onClick?: (
     <button
       type="button"
       onClick={onClick}
-      className="rounded-md px-1.5 py-1 font-mono text-[9px] tracking-[0.24em] text-white/45 transition-colors hover:bg-white/8 hover:text-white/85 light:text-black/45 light:hover:bg-black/8 light:hover:text-black/85"
+      className="pressable rounded-full border border-white/10 px-2.5 py-1.5 font-mono text-[9px] tracking-[0.24em] text-white/45 hover:border-white/18 hover:bg-white/8 hover:text-white/85 light:border-black/10 light:text-black/45 light:hover:bg-black/8 light:hover:text-black/85"
     >
       {children}
     </button>
