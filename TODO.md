@@ -51,5 +51,6 @@
 - [x] E1. 🔴 **输入法回车 bug**：Composer 的 Enter 处理无 IME 守卫——中文打拼音时按回车选字会**误发半成品消息**。修：`if (e.key === "Enter" && !e.nativeEvent.isComposing)`。src `InputBar.tsx` + 原型 `Composer.tsx` 同步改，placeholder `...`→`…`。tsc 通过。
 - [x] E2a. ✅ **单绿对齐**：transport ♥ 点赞从 `text-pink-400` 粉色改 `var(--accent)` 绿——`DESIGN.md` §颜色明确把「♥」列为全站唯一 accent，粉色是文档化违规（原型自身偏离设计法）。src `Player` + 原型 `PlayerBar` 同步。Playwright 实测：点赞后 ♥ = rgb(52,226,155) 绿填充。
 - [ ] E2b. 观察（产品决策，待你定）：`FAV`、`Mic` 是死按钮（无 onClick）。Mic=语音输入（未实现）、FAV≈与 Header 的 ♥Library 重复？要么接功能、要么移除/去交互感。不擅自改原型布局。
+- [x] E5. 🎨 **accent 单一事实源 + FocusView 状态诚实**：src 里 Toast、FocusView 把硬编码 `#34e29b` 改 `var(--accent)`（accent 改了能跟随；零视觉变化）。FocusView 顶部指示接 `connected`：断线→dim "Off air"、连上→绿 "On air"/"Speaking…"（`...`→`…`）。（FocusView 白卡上的深绿 `#1f9e6e` 是可读性故意为之，保留。）Playwright 实测：On air = rgb(52,226,155)、无破版。
 - [x] E3. 🟠 **状态诚实**：PlayerContext 有真实 `connected`(WS open/close)，但两处常驻指示**写死**——ChatStream 顶部恒显 "CONNECTED TO CLAUDIO SERVER"、Clock 恒显绿 "ON AIR"，server 断了也撒谎。接上：连上=原样；断开→ChatStream 脉冲 dim "CONNECTING TO CLAUDIO SERVER…"、Clock dim "OFF AIR"（保持单绿不引入新色）。happy path 文案样式不变无回归。Playwright 双态实测：连上 ON AIR/CONNECTED、断开 OFF AIR/CONNECTING…。
 - [x] E4. ♿ **键盘焦点环**：全局缺 `:focus-visible`，键盘用户 Tab 无一致焦点态。加 on-brand 绿环（零特异性 `:where`，排除表单控件以免与 composer 自带环双环）。Playwright 实测：按钮得绿环、输入框保留自带环不双环。仅键盘触发不影响鼠标。light/mobile(390) 截图确认无破版、无横向溢出。

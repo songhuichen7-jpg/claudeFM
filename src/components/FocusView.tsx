@@ -17,7 +17,7 @@ type Props = { open: boolean; onClose: () => void }
  * timestamped transcript that karaoke-highlights as the DJ talks.
  */
 export function FocusView({ open, onClose }: Props) {
-  const { currentTrack, currentTime, isPlaying, togglePlay, messages, activeDJId, djElapsedMs } = usePlayer()
+  const { currentTrack, currentTime, isPlaying, togglePlay, messages, activeDJId, djElapsedMs, connected } = usePlayer()
   const total = currentTrack?.duration ?? 0
   const title = currentTrack?.title ?? "—"
   const artist = currentTrack?.artist ?? "Claudio FM"
@@ -60,9 +60,15 @@ export function FocusView({ open, onClose }: Props) {
             <span className="font-mono text-[20px] tabular-nums text-white/70 max-sm:text-[13px]">{fmt(currentTime)}</span>
           </div>
           <div className="mt-2 flex items-center gap-2">
-            <span className="live-dot inline-block h-1.5 w-1.5 rounded-full" style={{ background: "#34e29b" }} />
-            <span className="font-mono text-[16px] tracking-[0.02em] max-sm:text-[11px]" style={{ color: "#34e29b" }}>
-              {speaking ? "Speaking..." : "On air"}
+            <span
+              className={connected ? "live-dot inline-block h-1.5 w-1.5 rounded-full" : "inline-block h-1.5 w-1.5 rounded-full bg-white/30"}
+              style={connected ? { background: "var(--accent)" } : undefined}
+            />
+            <span
+              className="font-mono text-[16px] tracking-[0.02em] max-sm:text-[11px]"
+              style={{ color: connected ? "var(--accent)" : "rgba(255,255,255,0.4)" }}
+            >
+              {!connected ? "Off air" : speaking ? "Speaking…" : "On air"}
             </span>
           </div>
           <div className="mt-12 h-[150px] text-white/85 max-sm:mt-6 max-sm:h-[84px]">

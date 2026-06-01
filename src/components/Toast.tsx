@@ -1,6 +1,6 @@
 import { usePlayer } from "../state/PlayerContext"
 
-const ACCENT = "#34e29b"
+const ACCENT = "var(--accent)"
 
 /** Transient ♥ feedback pill — fired by toggleLike, auto-dismisses. */
 export function Toast() {
@@ -18,7 +18,7 @@ export function Toast() {
             ? "flex items-center gap-2.5 rounded-md border bg-[#0a0a0c]/95 px-3.5 py-2 backdrop-blur-xl"
             : "flex items-center gap-2.5 rounded-md border bg-white/95 px-3.5 py-2 backdrop-blur-xl"
         }
-        style={{ borderColor: `${ACCENT}55` }}
+        style={{ borderColor: "color-mix(in srgb, var(--accent) 33%, transparent)" }}
       >
         <span className="font-mono text-[13px] leading-none" style={{ color: ACCENT }}>♥</span>
         <div className="flex items-baseline gap-2 whitespace-nowrap">
