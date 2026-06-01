@@ -9,24 +9,23 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByRole("button", { name: "Open Claudio profile" })).toBeVisible()
 })
 
-test("J1 shell + clock + player + WS connected", async ({ page }) => {
+test("J1 shell + clock + player + chat", async ({ page }) => {
   await expect(page.getByRole("button", { name: /ON AIR/ })).toBeVisible() // clock panel
-  await expect(page.getByText("QUEUE")).toBeVisible() // player bar meta row
-  // WebSocket connects → footer flips to CONNECTED.
-  await expect(page.getByText("CONNECTED", { exact: false }).last()).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByTestId("transport-play")).toBeVisible()
+  await expect(page.getByText("CONNECTED TO CLAUDIO SERVER")).toBeVisible({ timeout: 20_000 })
 })
 
 test("J2 chat history + DARK/LIGHT theme toggle", async ({ page }) => {
   await expect(page.getByText("CONNECTED TO CLAUDIO SERVER")).toBeVisible()
-  await page.getByRole("button", { name: "LIGHT" }).click()
+  await page.getByRole("button", { name: "LIGHT", exact: true }).click()
   await expect(page.locator("html")).toHaveClass(/light/)
-  await page.getByRole("button", { name: "DARK" }).click()
+  await page.getByRole("button", { name: "DARK", exact: true }).click()
   await expect(page.locator("html")).toHaveClass(/dark/)
 })
 
-test("J3 song request → Claude DJ turn round-trips", async ({ page }) => {
+test("J3 song request → LLM DJ turn round-trips", async ({ page }) => {
   // A real turn appends a user line + a CLAUDIO reply. Assert the CLAUDIO
-  // count grows (robust even if Claude/NCM fall back). Unique ask avoids
+  // count grows (robust even if LLM/NCM fall back). Unique ask avoids
   // colliding with persisted history.
   const ask = `放点慢的 ${Date.now() % 100000}`
   const claudioCount = () => page.getByText("CLAUDIO", { exact: true }).count()
@@ -60,7 +59,7 @@ test("J5 focus view: white card + bold title + transcript", async ({ page }) => 
 test("J6 settings: status / schedule / NCM / taste", async ({ page }) => {
   await page.getByRole("button", { name: "Open settings" }).click()
   await expect(page.getByText("STATUS", { exact: false })).toBeVisible()
-  await expect(page.getByText("Claude CLI")).toBeVisible()
+  await expect(page.getByText("LLM")).toBeVisible()
   await expect(page.getByText("SCHEDULE", { exact: false })).toBeVisible()
   await expect(page.getByText("品味语料", { exact: false })).toBeVisible()
 })

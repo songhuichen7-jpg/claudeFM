@@ -3,18 +3,56 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev:web": "vite",
     "dev:server": "tsx watch server/index.ts",
     "dev:prototype": "vite --config prototype/vite.config.ts",
     "dev": "concurrently -n web,server -c blue,magenta \"pnpm dev:web\" \"pnpm dev:server\"",
     "build:web": "tsc -b && vite build",
+    "build:server": "tsc -p tsconfig.server.build.json",
+    "build:desktop": "pnpm build:web && pnpm build:server",
     "build:prototype": "vite build --config prototype/vite.config.ts",
     "build": "pnpm build:web",
     "start": "node --import tsx server/index.ts",
+    "prepare:web-native": "pnpm rebuild better-sqlite3",
+    "prepare:desktop": "node node_modules/electron/install.js && electron-builder install-app-deps",
+    "desktop": "pnpm build:desktop && pnpm prepare:desktop && electron .",
+    "pack:mac": "pnpm build:desktop && pnpm prepare:desktop && electron-builder --mac --dir",
+    "dist:mac": "pnpm build:desktop && pnpm prepare:desktop && electron-builder --mac",
     "lint": "eslint .",
     "preview": "vite preview",
-    "e2e": "playwright test"
+    "e2e": "pnpm prepare:web-native && playwright test",
+    "e2e:desktop": "pnpm build:desktop && pnpm prepare:desktop && playwright test -c playwright.desktop.config.ts",
+    "e2e:desktop:packaged": "pnpm pack:mac && CLAUDIO_DESKTOP_EXECUTABLE=\"$(find release -path '*/Claudio FM.app/Contents/MacOS/Claudio FM' -type f | head -n 1)\" playwright test -c playwright.desktop.config.ts"
+  },
+  "build": {
+    "appId": "fm.claudio.desktop",
+    "productName": "Claudio FM",
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*"
+    ],
+    "files": [
+      "dist/**/*",
+      "dist-server/**/*",
+      "electron/**/*",
+      "prompts/**/*",
+      "user/**/*",
+      "user.night/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "category": "public.app-category.music",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "identity": null
+    }
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -48,6 +86,8 @@
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.1",
     "concurrently": "^9.2.1",
+    "electron": "^40.2.1",
+    "electron-builder": "^26.8.1",
     "eslint": "^10.3.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
