@@ -33,7 +33,7 @@ export type DJTurn = {
  */
 export type Intent =
   | { kind: "command"; cmd: "skip" | "pause" | "play" | "like" | "unlike"; arg?: string }
-  | { kind: "direct-music"; query: string }
+  | { kind: "direct-music"; title: string; artist?: string }
   | { kind: "llm"; text: string }
 
 type Seed = { title: string; artist: string; reason?: string }
@@ -61,8 +61,7 @@ export function classify(text: string): Intent {
   // "play <X> by <Y>" / "播放<X>" / "放一首<X>" / "来一首 <X>" / "听<X>"
   const directMusic = parseDirectMusic(t)
   if (directMusic) {
-    const query = directMusic.artist ? `${directMusic.title} by ${directMusic.artist}` : directMusic.title
-    return { kind: "direct-music", query }
+    return { kind: "direct-music", title: directMusic.title, artist: directMusic.artist }
   }
 
   return { kind: "llm", text: t }
@@ -72,8 +71,14 @@ function parseDirectMusic(text: string): { title: string; artist?: string } | nu
   const english = text.match(/^play\s+(.+?)(?:\s+by\s+(.+))?$/i)
   if (english) return directMusicPayload(english[1], english[2])
 
-  const chinese = text.match(/^(?:(?:请|帮我|给我)\s*)?(?:(?:播(?:放)?|放)(?:一下|一首|首)?|来(?:一首|首)?|听(?!说))\s*(.+?)(?:\s+(?:by|的)\s+(.+))?$/i)
-  if (chinese) return directMusicPayload(chinese[1], chinese[2])
+  // Chinese verb prefix, then either "<song> by <artist>" or possessive "<artist>的<song>".
+  // NB: "X by Y" puts the song first, but "X 的 Y" puts the ARTIST first — opposite
+  // operand order, so the 的 branch swaps. 的 needs no surrounding spaces (放周杰伦的晴天).
+  const chinese = text.match(/^(?:(?:请|帮我|给我)\s*)?(?:(?:播(?:放)?|放)(?:一下|一首|首)?|来(?:一首|首)?|听(?!说))\s*(.+?)(?:\s+by\s+(.+)|\s*的\s*(.+))?$/i)
+  if (chinese) {
+    if (chinese[3] !== undefined) return directMusicPayload(chinese[3], chinese[1]) // <artist>的<song> → title=song, artist=artist
+    return directMusicPayload(chinese[1], chinese[2])
+  }
 
   return null
 }
@@ -115,7 +120,8 @@ export async function runUserTurn(text: string): Promise<DJTurn> {
 
   // direct-music: bypass LLM, just resolve
   if (intent.kind === "direct-music") {
-    const result = await resolvePlayableTrack({ title: intent.query })
+    const label = intent.artist ? `${intent.title} · ${intent.artist}` : intent.title
+    const result = await resolvePlayableTrack({ title: intent.title, artist: intent.artist })
     if (result.track) {
       return finalize({
         say: `好，给你放 ${result.track.title}。`,
@@ -133,7 +139,7 @@ export async function runUserTurn(text: string): Promise<DJTurn> {
       })
     }
     return finalize({
-      say: `没找到 ${intent.query}，要不你说个艺人名我再搜搜？`,
+      say: `没找到 ${label}，要不你说个艺人名我再搜搜？`,
       source: "user",
       tracks: [],
     })
