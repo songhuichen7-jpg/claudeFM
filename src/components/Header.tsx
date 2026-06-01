@@ -10,7 +10,7 @@ type Props = {
 }
 
 /**
- * Top bar: cat avatar + pixel "Claudio" wordmark; a ♥-count Library shortcut,
+ * Top bar: veko (listener) avatar + pixel "Claudio" station wordmark; a ♥-count Library shortcut,
  * a settings gear, and a DARK / LIGHT segmented control. Restrained, mono.
  */
 export function Header({ onOpenProfile, onOpenSettings, onOpenLibrary }: Props) {
@@ -24,7 +24,7 @@ export function Header({ onOpenProfile, onOpenSettings, onOpenLibrary }: Props) 
         data-hover-lift="true"
         aria-label="Open Claudio profile"
       >
-        <CatAvatar size={42} mobileSize={32} className="ring-1 ring-white/15" />
+        <CatAvatar who="veko" size={42} mobileSize={32} className="ring-1 ring-white/15" />
         <span className="truncate font-pixel text-[26px] leading-none tracking-[0.04em] text-white/90 transition-colors group-hover:text-white light:text-black/85 sm:text-[42px]">
           Claudio
         </span>

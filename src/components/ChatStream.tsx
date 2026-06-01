@@ -86,13 +86,16 @@ function Row({
 
   if (msg.kind === "user") {
     return (
-      <div className="my-2 flex flex-col items-end">
-        <span className="mb-1 font-mono text-[9px] tracking-[0.26em] text-white/35 light:text-black/40">
-          VEKO · {msg.timestamp}
-        </span>
-        <div className="max-w-[80%] rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 font-mono text-[13px] leading-relaxed text-white/85 light:border-black/10 light:bg-black/[0.03] light:text-black/85">
-          {msg.text}
+      <div className="my-2 flex items-start justify-end gap-3">
+        <div className="flex min-w-0 max-w-[82%] flex-col items-end">
+          <span className="mb-1 font-mono text-[9px] tracking-[0.26em] text-white/35 light:text-black/40">
+            VEKO · {msg.timestamp}
+          </span>
+          <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 font-mono text-[13px] leading-relaxed text-white/85 light:border-black/10 light:bg-black/[0.03] light:text-black/85">
+            {msg.text}
+          </div>
         </div>
+        <CatAvatar who="veko" size={36} className="mt-5 shrink-0 ring-1 ring-white/15" />
       </div>
     )
   }

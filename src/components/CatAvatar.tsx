@@ -1,17 +1,26 @@
 import { clsx } from "clsx"
 import type { CSSProperties } from "react"
 
+const AVATARS = {
+  claudio: "/claudio-avatar.png", // the AI DJ (model)
+  veko: "/veko-avatar.png", // the listener (user)
+} as const
+
 /**
- * Claudio's video-reference avatar, reused in Header, Focus, Profile, and chat.
+ * Round avatar, reused in Header, Focus, Profile, and chat. `who` picks the
+ * identity — Claudio (the DJ/model) or veko (the listener/user). Defaults to
+ * claudio so the model's call sites stay untouched.
  */
 export function CatAvatar({
   size = 28,
   mobileSize,
   className,
+  who = "claudio",
 }: {
   size?: number
   mobileSize?: number
   className?: string
+  who?: keyof typeof AVATARS
 }) {
   return (
     <div
@@ -25,7 +34,7 @@ export function CatAvatar({
       } as CSSProperties}
     >
       <img
-        src="/claudio-avatar.png"
+        src={AVATARS[who]}
         alt=""
         className="absolute inset-0 h-full w-full object-cover"
         draggable={false}
