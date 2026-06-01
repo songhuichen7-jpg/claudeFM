@@ -11,7 +11,7 @@ import { CatAvatar } from "./CatAvatar"
  * (Historically named ChatStream.)
  */
 export function ChatStream() {
-  const { messages, activeDJId, djElapsedMs, replayDJ, selectTrack, liked, toggleLike, status } = usePlayer()
+  const { messages, activeDJId, djElapsedMs, replayDJ, selectTrack, liked, toggleLike, status, connected } = usePlayer()
   const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -33,8 +33,14 @@ export function ChatStream() {
       </div>
 
       <div ref={scrollRef} className="thin-scroll min-h-0 flex-1 overflow-y-auto pb-7 pr-1">
-        <div className="py-2 text-center font-mono text-[9px] tracking-[0.3em] text-white/25 light:text-black/30">
-          CONNECTED TO CLAUDIO SERVER
+        <div
+          className={
+            connected
+              ? "py-2 text-center font-mono text-[9px] tracking-[0.3em] text-white/25 light:text-black/30"
+              : "live-dot py-2 text-center font-mono text-[9px] tracking-[0.3em] text-white/45 light:text-black/45"
+          }
+        >
+          {connected ? "CONNECTED TO CLAUDIO SERVER" : "CONNECTING TO CLAUDIO SERVER…"}
         </div>
         {messages.map(m => (
           <Row

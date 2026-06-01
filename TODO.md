@@ -50,3 +50,4 @@
 
 - [x] E1. 🔴 **输入法回车 bug**：Composer 的 Enter 处理无 IME 守卫——中文打拼音时按回车选字会**误发半成品消息**。修：`if (e.key === "Enter" && !e.nativeEvent.isComposing)`。src `InputBar.tsx` + 原型 `Composer.tsx` 同步改，placeholder `...`→`…`。tsc 通过。
 - [ ] E2. 观察（待你定，原型即如此非 bug）：transport ♥ 点赞用 `text-pink-400` 粉色，与「单绿」设计冲突（Header/TrackCard 的 ♥ 都是绿）；`FAV`、`Mic` 是死按钮（无 onClick）。要不要统一成绿 / 给死按钮去交互感或接功能。
+- [x] E3. 🟠 **状态诚实**：PlayerContext 有真实 `connected`(WS open/close)，但两处常驻指示**写死**——ChatStream 顶部恒显 "CONNECTED TO CLAUDIO SERVER"、Clock 恒显绿 "ON AIR"，server 断了也撒谎。接上：连上=原样；断开→ChatStream 脉冲 dim "CONNECTING TO CLAUDIO SERVER…"、Clock dim "OFF AIR"（保持单绿不引入新色）。happy path 文案样式不变无回归。
