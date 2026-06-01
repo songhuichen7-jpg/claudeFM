@@ -1,11 +1,10 @@
 import { createHash } from "node:crypto"
 import { existsSync, mkdirSync } from "node:fs"
 import { writeFile } from "node:fs/promises"
-import { dirname, join, resolve } from "node:path"
-import { fileURLToPath } from "node:url"
+import { join } from "node:path"
+import { dataPath } from "./paths.js"
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-export const CACHE_DIR = resolve(__dirname, "..", "cache", "tts")
+export const CACHE_DIR = dataPath("cache", "tts")
 mkdirSync(CACHE_DIR, { recursive: true })
 
 // --- providers --------------------------------------------------------------
@@ -18,23 +17,37 @@ const MIMO_BASE = process.env.MIMO_BASE_URL ?? "https://api.xiaomimimo.com/v1"
 const FISH_KEY = process.env.FISH_API_KEY
 const FISH_VOICE = process.env.FISH_VOICE_ID
 
+const TTS_NORMALISE_VERSION = "tts-polish-v2"
+const KEEP_CAPS = new Set(["III", "VIII", "XII", "USA", "UK", "DJ", "FM", "OK", "EDM"])
 const DJ_STYLE_INSTRUCTION =
   process.env.MIMO_STYLE ??
-  "用自然、放松的语速念。中文按普通中文发音。英文单词、英文歌名、英文艺人名都按英文自然连读发音（不要逐个字母拼）。"
+  "像深夜电台主持一样念：音量稳定，语速放松，短句之间自然停顿。中文用普通话自然口语；英文歌名、艺人名、单词按英文连读，不要逐字母拼读。不要念出标点、破折号、括号或 Markdown 符号。"
 
 /**
- * Normalise the say text before sending to MiMo TTS:
- * - ALL-CAPS English tokens of 3+ letters → TitleCase (避免被当成首字母缩写)
- * - 多余空白合并
+ * Normalise the displayed DJ copy into speech-friendly text before TTS.
+ * This does not change the chat transcript; it only prevents engines from
+ * reading UI punctuation / Markdown / separators as literal words.
  */
 function normaliseForTts(text: string): string {
   return text
-    // ALL CAPS 单词 (3+ 字母) → TitleCase；保留 II / III / IV 等罗马数字与 OK / DJ / FM 等熟知缩写
+    .replace(/\[([^\]]+)\]\((?:https?:\/\/|mailto:|tel:|ftp:\/\/)[^)]+\)/g, "$1")
+    .replace(/[`*_~#>]+/g, "")
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "")
+    .replace(/\bfeat\.?\b/gi, "featuring")
+    .replace(/\bft\.?\b/gi, "featuring")
+    .replace(/&/g, " and ")
+    .replace(/[《》「」『』“”"()（）[\]{}]/g, "")
+    .replace(/[·•]/g, "，")
+    .replace(/\s*[—–]\s*/g, "，")
+    .replace(/\s+-\s+/g, "，")
+    .replace(/\s*\/\s*/g, "，")
     .replace(/\b[A-Z]{3,}\b/g, (m) => {
-      const keep = new Set(["III", "VIII", "XII", "USA", "UK", "DJ", "FM", "OK", "EDM"])
-      if (keep.has(m)) return m
+      if (KEEP_CAPS.has(m)) return m
       return m[0] + m.slice(1).toLowerCase()
     })
+    .replace(/([。！？!?]){2,}/g, "$1")
+    .replace(/([,，、]){2,}/g, "，")
+    .replace(/\s*([,，、。！？!?])\s*/g, "$1")
     .replace(/\s+/g, " ")
     .trim()
 }
@@ -51,14 +64,15 @@ export type TtsResult = {
 
 export async function synthesize(text: string): Promise<TtsResult> {
   const cleaned = text.trim()
-  const provider: "mimo" | "fish" | "silent" = MIMO_KEY ? "mimo" : FISH_KEY ? "fish" : "silent"
+  const provider: "mimo" | "fish" | "silent" =
+    process.env.CLAUDIO_E2E_STUB === "1" ? "silent" : MIMO_KEY ? "mimo" : FISH_KEY ? "fish" : "silent"
   const ext = provider === "silent" ? "mp3" : provider === "mimo" ? "wav" : "mp3"
   const speechText = provider === "mimo" ? normaliseForTts(cleaned) : cleaned
 
   // Cache key includes the spoken text and style instruction so old robotic
   // MiMo files created with previous prompt tags are not silently reused.
   const hash = createHash("sha256")
-    .update(`${provider}::${MIMO_MODEL}::${MIMO_VOICE}::${FISH_VOICE ?? ""}::${DJ_STYLE_INSTRUCTION}::${speechText}`)
+    .update(`${TTS_NORMALISE_VERSION}::${provider}::${MIMO_MODEL}::${MIMO_VOICE}::${FISH_VOICE ?? ""}::${DJ_STYLE_INSTRUCTION}::${speechText}`)
     .digest("hex")
     .slice(0, 16)
   const file = join(CACHE_DIR, `${hash}.${ext}`)
@@ -97,9 +111,8 @@ export async function synthesize(text: string): Promise<TtsResult> {
 async function synthMimo(text: string, outFile: string): Promise<{ bytes: number } | null> {
   if (!MIMO_KEY) return null
   try {
-    // Only normalise ALL-CAPS English → TitleCase so the model doesn't read
-    // those tokens as letter-by-letter acronyms. No inline style tag — that
-    // turned out to make Chinese also sound robotic.
+    // Keep style as a separate instruction. Inline tags in the spoken content
+    // made the Chinese delivery sound stiff in MiMo.
     const normalised = normaliseForTts(text)
     const body = {
       model: MIMO_MODEL,

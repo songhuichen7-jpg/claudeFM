@@ -3,6 +3,7 @@ import type { DJTurn, ResolvedTrack } from "./router.js"
 
 export type WsEvent =
   | { type: "dj"; turn: DJTurn }
+  | { type: "dj-tts"; turn: DJTurn }
   | { type: "now-playing"; track: ResolvedTrack | null; startedAt: number }
   | { type: "hello"; ts: number }
   | { type: "skip"; trackId: string }

@@ -5,11 +5,10 @@ import fastifyStatic from "@fastify/static"
 import fastifyCors from "@fastify/cors"
 import { existsSync, statSync, mkdirSync, cpSync } from "node:fs"
 import { writeFile, readFile, readdir } from "node:fs/promises"
-import { dirname, join, resolve, basename } from "node:path"
-import { fileURLToPath } from "node:url"
+import { join, basename } from "node:path"
 
 import { Hub } from "./hub.js"
-import { runUserTurn } from "./router.js"
+import { hydrateTurnTts, runUserTurn, type DJTurn } from "./router.js"
 import { startScheduler, manualTrigger, lastMoodReport } from "./scheduler.js"
 import {
   Messages,
@@ -20,17 +19,17 @@ import {
   activeProfile,
   setActiveProfile,
 } from "./state.js"
-import { claudeAvailable } from "./claude.js"
+import { llmStatus } from "./llm.js"
 import { CACHE_DIR as TTS_DIR, ttsProvider } from "./tts.js"
 import { getWeather } from "./weather.js"
 import { calendarEnabled } from "./feishu.js"
 import { naimEnabled } from "./naim.js"
 import { activeCorpusDir } from "./context.js"
+import { appPath, dataPath, DIST_DIR } from "./paths.js"
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const ROOT = resolve(__dirname, "..")
 const PORT = Number(process.env.PORT ?? 8080)
-const DIST = join(ROOT, "dist")
+const HOST = process.env.HOST ?? "0.0.0.0"
+const DIST = DIST_DIR
 
 const fastify = Fastify({ logger: true })
 
@@ -55,19 +54,30 @@ if (existsSync(DIST) && statSync(DIST).isDirectory()) {
 
 const hub = new Hub()
 
-fastify.get("/api/health", async () => ({
-  ok: true,
-  ts: Date.now(),
-  claude: await claudeAvailable(),
-  calendar: calendarEnabled(),
-  naim: naimEnabled(),
-  weather: !!(await getWeather()),
-  fish: !!process.env.FISH_API_KEY,
-  mimo: !!process.env.MIMO_API_KEY,
-  ttsProvider: ttsProvider(),
-  activeProfile: activeProfile(),
-  moodProbe: lastMoodReport(),
-}))
+function broadcastTurn(turn: DJTurn) {
+  hub.broadcast({ type: "dj", turn })
+  hydrateTurnTts(turn, ready => hub.broadcast({ type: "dj-tts", turn: ready }))
+    .catch(err => fastify.log.warn({ err }, "TTS hydration failed"))
+}
+
+fastify.get("/api/health", async () => {
+  const llm = await llmStatus()
+  return {
+    ok: true,
+    ts: Date.now(),
+    // Legacy field kept for older clients/tests; new UI reads `llm`.
+    claude: llm.provider === "claude-cli" ? llm.available : false,
+    llm,
+    calendar: calendarEnabled(),
+    naim: naimEnabled(),
+    weather: !!(await getWeather()),
+    fish: !!process.env.FISH_API_KEY,
+    mimo: !!process.env.MIMO_API_KEY,
+    ttsProvider: ttsProvider(),
+    activeProfile: activeProfile(),
+    moodProbe: lastMoodReport(),
+  }
+})
 
 fastify.post("/api/chat", async (req, reply) => {
   const body = (req.body ?? {}) as { text?: string }
@@ -78,7 +88,7 @@ fastify.post("/api/chat", async (req, reply) => {
   }
   const turn = await runUserTurn(text)
   // Broadcast to all WS clients so the chat stream shows up everywhere
-  hub.broadcast({ type: "dj", turn })
+  broadcastTurn(turn)
   return turn
 })
 
@@ -164,11 +174,16 @@ fastify.post<{ Body: { id?: string; name?: string; avatar?: string } }>("/api/pr
     return { error: "profile id already exists" }
   }
   const corpus_dir = `user.${id}`
-  const dest = join(ROOT, corpus_dir)
+  const dest = dataPath(corpus_dir)
   if (!existsSync(dest)) {
     // Seed from the default user/ directory so the new profile boots
     // with a sane starting taste corpus the user can then customise.
-    cpSync(join(ROOT, "user"), dest, { recursive: true })
+    const seed = appPath("user")
+    if (existsSync(seed)) {
+      cpSync(seed, dest, { recursive: true })
+    } else {
+      mkdirSync(dest, { recursive: true })
+    }
   }
   const profile = Profiles.create({
     id,
@@ -232,12 +247,18 @@ fastify.post<{ Body: { key?: string } }>("/api/ncm/login/qr/check", async (req, 
   }
   const { qrCheck } = await import("./ncm-auth.js")
   const r = await qrCheck(key)
+  if (r.status === "success") {
+    const { clearNcmCaches } = await import("./ncm.js")
+    clearNcmCaches()
+  }
   return r
 })
 
 fastify.post("/api/ncm/logout", async () => {
   const { clearCookie } = await import("./ncm-auth.js")
   clearCookie()
+  const { clearNcmCaches } = await import("./ncm.js")
+  clearNcmCaches()
   return { ok: true }
 })
 
@@ -344,18 +365,16 @@ fastify.post<{ Body: { taste_md?: string; playlists_json?: unknown } }>(
 )
 
 // Silent NCM resolution — used by the PWA's prefetch path. Does not touch
-// state.db, does not broadcast, does not run claude.
-fastify.post<{ Body: { query?: string } }>("/api/resolve", async (req, reply) => {
-  const query = String(req.body?.query ?? "").trim()
-  if (!query) {
+// state.db, does not broadcast, does not run the LLM.
+fastify.post<{ Body: { query?: string; title?: string; artist?: string } }>("/api/resolve", async (req, reply) => {
+  const title = String(req.body?.title ?? req.body?.query ?? "").trim()
+  const artist = String(req.body?.artist ?? "").trim()
+  if (!title) {
     reply.code(400)
     return { error: "query required" }
   }
-  const { resolveTrack, songUrl } = await import("./ncm.js")
-  const t = await resolveTrack({ title: query })
-  if (!t) return { track: null }
-  const url = (await songUrl(t.id)) ?? null
-  return { track: url ? { ...t, url } : null }
+  const { resolvePlayableTrack } = await import("./ncm.js")
+  return resolvePlayableTrack({ title, artist: artist || undefined })
 })
 
 fastify.post("/api/trigger", async (req) => {
@@ -382,8 +401,8 @@ fastify.register(async function (instance) {
 startScheduler(hub)
 
 try {
-  await fastify.listen({ host: "0.0.0.0", port: PORT })
-  console.log(`Claudio FM server up at http://localhost:${PORT}`)
+  await fastify.listen({ host: HOST, port: PORT })
+  console.log(`Claudio FM server up at http://${HOST}:${PORT}`)
 } catch (err) {
   console.error(err)
   process.exit(1)

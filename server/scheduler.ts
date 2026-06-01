@@ -1,5 +1,5 @@
 import cron from "node-cron"
-import { runScheduledBroadcast, type DJTurn } from "./router.js"
+import { hydrateTurnTts, runScheduledBroadcast, type DJTurn } from "./router.js"
 import { Plays, SchedulerLog } from "./state.js"
 import type { Hub } from "./hub.js"
 
@@ -20,6 +20,12 @@ export type MoodReport = {
 let lastReport: MoodReport | null = null
 export function lastMoodReport() {
   return lastReport
+}
+
+function broadcastTurn(hub: Hub, turn: DJTurn) {
+  hub.broadcast({ type: "dj", turn })
+  hydrateTurnTts(turn, ready => hub.broadcast({ type: "dj-tts", turn: ready }))
+    .catch(err => console.warn("[scheduler] tts hydration failed", (err as Error).message))
 }
 
 function computeMood(): { broadcast: boolean; reason: string; signals: MoodReport["signals"] } {
@@ -55,7 +61,7 @@ export function startScheduler(hub: Hub) {
     const turn = await runScheduledBroadcast(
       "现在是 07:00，给我做一个今天的简短开场，一首钢琴或弦乐，慢慢起。",
     )
-    hub.broadcast({ type: "dj", turn })
+    broadcastTurn(hub, turn)
   })
 
   // 09:00 — 早间播报
@@ -64,7 +70,7 @@ export function startScheduler(hub: Hub) {
     const turn = await runScheduledBroadcast(
       "现在是 09:00，给我一首 city pop 或 shibuya-kei，简短开场。",
     )
-    hub.broadcast({ type: "dj", turn })
+    broadcastTurn(hub, turn)
   })
 
   // 每小时整点 mood probe — 真的决策
@@ -83,7 +89,7 @@ export function startScheduler(hub: Hub) {
     const turn = await runScheduledBroadcast(
       `每小时情绪检查 (hr=${report.hour})：${decision.reason}。请根据这个信号做出动作。`,
     )
-    hub.broadcast({ type: "dj", turn })
+    broadcastTurn(hub, turn)
   })
 
   console.log("[scheduler] cron jobs armed: 07:00 daily plan, 09:00 morning, hourly mood probe")
@@ -96,6 +102,6 @@ export function manualTrigger(
 ): Promise<void> {
   SchedulerLog.add("manual", reason)
   return runScheduledBroadcast(reason, source)
-    .then(turn => hub.broadcast({ type: "dj", turn }))
+    .then(turn => broadcastTurn(hub, turn))
     .catch(err => console.warn("[scheduler] manual trigger failed", (err as Error).message))
 }

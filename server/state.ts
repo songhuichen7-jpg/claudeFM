@@ -1,10 +1,9 @@
 import Database from "better-sqlite3"
-import { dirname, resolve } from "node:path"
-import { fileURLToPath } from "node:url"
 import { mkdirSync } from "node:fs"
+import { dirname } from "node:path"
+import { dataPath } from "./paths.js"
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const DB_PATH = resolve(__dirname, "..", "state.db")
+const DB_PATH = dataPath("state.db")
 mkdirSync(dirname(DB_PATH), { recursive: true })
 
 export const db = new Database(DB_PATH)
@@ -92,8 +91,12 @@ const haveDefault = db.prepare("SELECT 1 FROM profiles WHERE id = 'default'").ge
 if (!haveDefault) {
   db.prepare(
     "INSERT INTO profiles (id, name, avatar, corpus_dir, created_at) VALUES (?, ?, ?, ?, ?)",
-  ).run("default", "mmguo", "🐱", "user", Date.now())
+  ).run("default", "veko", "🐱", "user", Date.now())
 }
+
+db.prepare("UPDATE profiles SET name = ? WHERE id = ? AND name = ?").run("veko", "default", "mmguo")
+db.prepare("UPDATE profiles SET name = ? WHERE id = ? AND name = ?").run("Night-mode veko", "night", "Night-mode mmguo")
+db.prepare("UPDATE messages SET speaker = ? WHERE kind = ? AND speaker = ?").run("veko", "user", "mmguo")
 
 // ---- active profile (process-scoped, persisted via prefs) -----------------
 
@@ -200,6 +203,22 @@ export const Messages = {
     return db
       .prepare("SELECT * FROM messages WHERE profile_id = ? ORDER BY ts ASC")
       .all(profileId) as MessageRow[]
+  },
+  updateMeta(id: string, update: (meta: Record<string, unknown>) => Record<string, unknown>, profileId = ACTIVE) {
+    const row = db
+      .prepare("SELECT meta_json FROM messages WHERE id = ? AND profile_id = ?")
+      .get(id, profileId) as { meta_json: string | null } | undefined
+    if (!row) return
+    let meta: Record<string, unknown> = {}
+    if (row.meta_json) {
+      try {
+        meta = JSON.parse(row.meta_json)
+      } catch {
+        meta = {}
+      }
+    }
+    db.prepare("UPDATE messages SET meta_json = ? WHERE id = ? AND profile_id = ?")
+      .run(JSON.stringify(update(meta)), id, profileId)
   },
 }
 
