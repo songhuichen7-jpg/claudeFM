@@ -45,3 +45,8 @@
 - [x] D8. ✅ **桌面端阻断已修复**（验证中发现）：`pnpm desktop` / `e2e:desktop` 启动即崩——内嵌 server `ERR_DLOPEN_FAILED`，better-sqlite3 ABI 不匹配（node 147 vs electron 143）。根因：`prepare:desktop`(`electron-builder install-app-deps`) 默认 `buildFromSource=false`，下的是 node-ABI 预编译产物。**修复**：`package.json` `build` 段加 `"buildDependenciesFromSource": true` → install-app-deps 从源码针对 electron 头编译。验证：`pnpm e2e:desktop` 跑绿（6.8s，server boot + UI + 主题切换 + LLM 可见）。手动启动也确认 server 起、UI 加载、TTS wav 流（206）。
 - [x] D10. ✅ **头像区分 user/model**：veko(你)=萨摩耶 `public/veko-avatar.png`，Claudio(模型)=橘猫 `public/claudio-avatar.png`。`CatAvatar` 泛化加 `who:"claudio"|"veko"`（默认 claudio，Profile/Focus/CLAUDIO 消息零改动）；Header 顶部头像→veko、字标仍电台名 Claudio；ChatStream 给 VEKO 消息加右侧萨摩耶头像。实测：header=萨摩耶、VEKO 消息右=萨摩耶、CLAUDIO 消息左=猫。
 - [ ] D9. 🟡 follow-up（不阻断）：`tests/e2e/desktop.spec.ts` 的 `waitForHttp` 默认 30s，对 from-source **冷编译后首启**偏紧（第二次跑因此 flaky，warm 重跑即绿）。建议提到 ~60s。另：web↔desktop 切换需各自 rebuild better-sqlite3（`prepare:web-native` 已接进 `e2e`；`pnpm dev` 之后跑过 desktop 要手动 `pnpm rebuild better-sqlite3` 切回 node-ABI）。
+
+## E. 体验打磨（真实用户 + Apple-PM 视角）
+
+- [x] E1. 🔴 **输入法回车 bug**：Composer 的 Enter 处理无 IME 守卫——中文打拼音时按回车选字会**误发半成品消息**。修：`if (e.key === "Enter" && !e.nativeEvent.isComposing)`。src `InputBar.tsx` + 原型 `Composer.tsx` 同步改，placeholder `...`→`…`。tsc 通过。
+- [ ] E2. 观察（待你定，原型即如此非 bug）：transport ♥ 点赞用 `text-pink-400` 粉色，与「单绿」设计冲突（Header/TrackCard 的 ♥ 都是绿）；`FAV`、`Mic` 是死按钮（无 onClick）。要不要统一成绿 / 给死按钮去交互感或接功能。

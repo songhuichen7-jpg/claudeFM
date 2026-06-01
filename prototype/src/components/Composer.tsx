@@ -29,12 +29,14 @@ export function Composer() {
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           onKeyDown={e => {
-            if (e.key === "Enter") {
+            // Don't submit while an IME composition is active — pressing Enter to
+            // pick a pinyin/kana candidate must commit the character, not the message.
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
               e.preventDefault()
               submit()
             }
           }}
-          placeholder="Say something to the DJ..."
+          placeholder="Say something to the DJ…"
           className="font-mono flex-1 bg-transparent px-1.5 py-1 text-[12.5px] tracking-[0.02em] text-white/90 outline-none placeholder:text-white/30 light:text-black/85 light:placeholder:text-black/35"
           aria-label="Message DJ"
         />
