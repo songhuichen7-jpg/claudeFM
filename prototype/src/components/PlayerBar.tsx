@@ -62,8 +62,8 @@ export function PlayerBar() {
           </Icon>
           <Icon label="Next" onClick={next}><SkipForward size={15} /></Icon>
           <Icon label="Stop" onClick={stop}><Square size={12} fill="currentColor" /></Icon>
-          <Icon label="Like" onClick={() => toggleLike()} className={clsx(isLiked && "!text-pink-400")}>
-            <Heart size={14} fill={isLiked ? "currentColor" : "none"} />
+          <Icon label="Like" onClick={() => toggleLike()}>
+            <Heart size={14} fill={isLiked ? "currentColor" : "none"} style={isLiked ? { color: "var(--accent)" } : undefined} />
           </Icon>
           <TextBtn onClick={toggleHideChat}>{hideChat ? "SHOW" : "HIDE"}</TextBtn>
           <TextBtn>FAV</TextBtn>
