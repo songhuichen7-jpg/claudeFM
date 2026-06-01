@@ -3,11 +3,9 @@
 // anything. The caller (PWA) shows a diff and then calls /api/taste/apply
 // with the chosen fields.
 
-import { spawn } from "node:child_process"
-import { tmpdir as __tmpdir } from "node:os"
-import { readFile } from "node:fs/promises"
+import { readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { askDJ } from "./claude.js"
+import { generateLLMText } from "./llm.js"
 import { activeCorpusDir } from "./context.js"
 
 export type TasteProposal = {
@@ -126,79 +124,27 @@ title|artist
 - 不要在最后一个段落（PLAYLISTS_JSON 内容之后）再加任何文字`
 
 export async function analyzePaste(paste: string): Promise<TasteProposal> {
-  const dir = activeCorpusDir()
-  let tasteMd = ""
-  let playlistsJson = ""
-  try {
-    tasteMd = await readFile(join(dir, "taste.md"), "utf-8")
-  } catch {}
-  try {
-    playlistsJson = await readFile(join(dir, "playlists.json"), "utf-8")
-  } catch {}
-
-  const userPrompt = [
-    "<CURRENT_CORPUS>",
-    "## taste.md",
-    "```markdown",
-    tasteMd,
-    "```",
-    "",
-    "## playlists.json",
-    "```json",
-    playlistsJson,
-    "```",
-    "</CURRENT_CORPUS>",
-    "",
-    "<NEW_LISTENING>",
-    paste.trim(),
-    "</NEW_LISTENING>",
-    "",
-    "现在按输出协议给我新的 taste_md + playlists_json + detected_tracks。",
-  ].join("\n")
-
-  const dj = await askDJ(SYSTEM, userPrompt)
-  // askDJ guarantees say/play but we put the proposal inside extra fields,
-  // which the simple parser drops. So we go through the raw output: re-parse
-  // by asking askDJ for the *whole* JSON and let normalize() throw away unknown
-  // fields. Workaround: call askDJ but also include taste_md/playlists_json
-  // in `reason` if needed.
-  //
-  // Cleaner: askDJ already returns DJOutput strict shape. We extend by piggy
-  // backing on `reason` which can carry the proposal JSON. But our model is
-  // smart enough — let's do it correctly by parsing the same way askDJ does
-  // but exposing the extra fields. Implemented in extractProposal below.
-
-  // Re-run with a dedicated parser tied to extractProposal
-  return extractProposalFromDJOutput(dj)
-}
-
-function extractProposalFromDJOutput(dj: Awaited<ReturnType<typeof askDJ>>): TasteProposal {
-  // askDJ normalised the response: we know `reason` is a string, but we want
-  // taste_md/playlists_json/detected_tracks too. Since askDJ already drops
-  // unknown keys, the cleanest path is to re-call extraction logic. Instead,
-  // we keep this simple by stuffing them through the reason / segue. But the
-  // model output already includes those keys — askDJ just didn't surface them.
-  //
-  // Strategy: this function is only used in tests; production path is
-  // `analyzePasteRaw` below which parses the raw stdout itself.
-  return { summary: dj.reason ?? "", detected_tracks: [] }
+  return analyzePasteRaw(paste)
 }
 
 /**
- * Raw entrypoint that bypasses askDJ's normalisation and parses taste_md /
- * playlists_json / detected_tracks directly.
+ * Raw entrypoint that parses taste_md / playlists_json / detected_tracks
+ * directly from the configured LLM's sectioned text output.
  */
 export async function analyzePasteRaw(paste: string): Promise<TasteProposal> {
-  const { spawn } = await import("node:child_process")
   const dir = activeCorpusDir()
   let tasteMd = ""
   let playlistsJson = ""
   try {
     tasteMd = await readFile(join(dir, "taste.md"), "utf-8")
-  } catch {}
+  } catch {
+    /* missing taste.md is allowed */
+  }
   try {
     playlistsJson = await readFile(join(dir, "playlists.json"), "utf-8")
-  } catch {}
+  } catch {
+    /* missing playlists.json is allowed */
+  }
 
   const userPrompt = [
     "<CURRENT_CORPUS>",
@@ -220,46 +166,21 @@ export async function analyzePasteRaw(paste: string): Promise<TasteProposal> {
     "现在按输出协议给我新的 taste_md + playlists_json + detected_tracks。",
   ].join("\n")
 
-  const combined = `${SYSTEM}\n\n---\n\n${userPrompt}`
-
-  return new Promise<TasteProposal>((resolve, reject) => {
-    const proc = spawn(process.env.CLAUDE_BIN || "claude", [
-      "-p",
-      combined,
-      "--output-format",
-      "json",
-      "--model",
-      "claude-sonnet-4-6",
-    ], { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env }, cwd: __tmpdir() })
-
-    let stdout = ""
-    let stderr = ""
-    proc.stdout.on("data", d => (stdout += d.toString()))
-    proc.stderr.on("data", d => (stderr += d.toString()))
-
-    const timeout = setTimeout(() => {
-      proc.kill("SIGKILL")
-      reject(new Error("claude analyze: timed out after 1200s"))
-    }, 1200_000)
-
-    proc.on("error", err => { clearTimeout(timeout); reject(err) })
-    proc.on("close", code => {
-      clearTimeout(timeout)
-      if (code !== 0) return reject(new Error(`claude analyze exited ${code}: ${stderr.slice(0, 400)}`))
-      try {
-        const env = JSON.parse(stdout)
-        const text: string = env.result ?? env.text ?? ""
-        const proposal = parseSectionedResponse(text)
-        if (!proposal) {
-          import("node:fs").then(fs => fs.writeFileSync("/tmp/claude-analyze-failed.txt", text)).catch(() => undefined)
-          return reject(new Error(`claude analyze: cannot parse (len=${text.length}, head=${text.slice(0, 150)})`))
-        }
-        resolve(proposal)
-      } catch (err) {
-        reject(new Error(`claude analyze: bad JSON envelope (${(err as Error).message})`))
-      }
+  try {
+    const text = await generateLLMText(SYSTEM, userPrompt, {
+      timeoutMs: 1200_000,
+      maxTokens: Number(process.env.LLM_TASTE_MAX_TOKENS ?? 12_000),
+      temperature: Number(process.env.LLM_TASTE_TEMPERATURE ?? 0.2),
     })
-  })
+    const proposal = parseSectionedResponse(text)
+    if (!proposal) {
+      await writeFile("/tmp/llm-analyze-failed.txt", text).catch(() => undefined)
+      throw new Error(`cannot parse (len=${text.length}, head=${text.slice(0, 150)})`)
+    }
+    return proposal
+  } catch (err) {
+    throw new Error(`llm analyze: ${(err as Error).message}`, { cause: err })
+  }
 }
 
 /**
@@ -277,53 +198,28 @@ export async function rebuildPasteRaw(paste: string): Promise<TasteProposal> {
     "上面 <SOURCE> 里是用户在汽水音乐里全部 ❤️ 收藏的歌。请按输出协议从零构建 taste.md 和 playlists.json。",
   ].join("\n")
 
-  const combined = `${REBUILD_SYSTEM}\n\n---\n\n${userPrompt}`
-
-  return new Promise<TasteProposal>((resolve, reject) => {
-    const proc = spawn(process.env.CLAUDE_BIN || "claude", [
-      "-p",
-      combined,
-      "--output-format",
-      "json",
-      "--model",
-      "claude-sonnet-4-6",
-    ], { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env }, cwd: __tmpdir() })
-
-    let stdout = ""
-    let stderr = ""
-    proc.stdout.on("data", d => (stdout += d.toString()))
-    proc.stderr.on("data", d => (stderr += d.toString()))
-
-    const timeout = setTimeout(() => {
-      proc.kill("SIGKILL")
-      reject(new Error("claude rebuild: timed out after 1200s"))
-    }, 1200_000)
-
-    proc.on("error", err => { clearTimeout(timeout); reject(err) })
-    proc.on("close", code => {
-      clearTimeout(timeout)
-      if (code !== 0) return reject(new Error(`claude rebuild exited ${code}: ${stderr.slice(0, 400)}`))
-      try {
-        const env = JSON.parse(stdout)
-        const text: string = env.result ?? env.text ?? ""
-        // Always dump raw output for inspection — this is a long, opaque run
-        import("node:fs").then(fs => fs.writeFileSync("/tmp/claude-rebuild-raw.txt", text)).catch(() => undefined)
-        const proposal = parseSectionedResponse(text)
-        if (!proposal) {
-          return reject(new Error(`claude rebuild: cannot parse (len=${text.length}, head=${text.slice(0, 150)})`))
-        }
-        resolve(proposal)
-      } catch (err) {
-        reject(new Error(`claude rebuild: bad JSON envelope (${(err as Error).message})`))
-      }
+  try {
+    const text = await generateLLMText(REBUILD_SYSTEM, userPrompt, {
+      timeoutMs: 1200_000,
+      maxTokens: Number(process.env.LLM_TASTE_REBUILD_MAX_TOKENS ?? 16_000),
+      temperature: Number(process.env.LLM_TASTE_TEMPERATURE ?? 0.2),
     })
-  })
+    // Always dump raw output for inspection — this is a long, opaque run.
+    await writeFile("/tmp/llm-rebuild-raw.txt", text).catch(() => undefined)
+    const proposal = parseSectionedResponse(text)
+    if (!proposal) {
+      throw new Error(`cannot parse (len=${text.length}, head=${text.slice(0, 150)})`)
+    }
+    return proposal
+  } catch (err) {
+    throw new Error(`llm rebuild: ${(err as Error).message}`, { cause: err })
+  }
 }
 
 /**
  * Parse the SUMMARY/DETECTED/TASTE_MD/PLAYLISTS_JSON sectioned format. We do
- * this instead of asking the model for a single nested JSON because Claude
- * is unreliable about escaping " and \\n inside long string values.
+ * this instead of asking the model for a single nested JSON because long
+ * string values are easy for providers to mangle with escaping.
  */
 function parseSectionedResponse(text: string): TasteProposal | null {
   const re = /^={3,}(SUMMARY|DETECTED|TASTE_MD|PLAYLISTS_JSON)={3,}\s*$/gm
@@ -379,8 +275,10 @@ function parseSectionedResponse(text: string): TasteProposal | null {
   }
 }
 
-function extractJSON(text: string): any | null {
-  try { return JSON.parse(text.trim()) } catch {}
+function extractJSON(text: string): unknown | null {
+  try { return JSON.parse(text.trim()) } catch {
+    /* try fenced JSON below */
+  }
   // Strip a possible ```json … ``` outer fence WITHOUT greedy-matching the
   // inner ``` that might appear inside taste_md content (e.g. example
   // markdown blocks). We do this by trimming the leading fence header and
@@ -389,7 +287,9 @@ function extractJSON(text: string): any | null {
   if (fenced.startsWith("```")) {
     const noHead = fenced.replace(/^```(?:json)?\s*/i, "")
     const noTail = noHead.replace(/```\s*$/i, "")
-    try { return JSON.parse(noTail) } catch {}
+    try { return JSON.parse(noTail) } catch {
+      /* try brace extraction below */
+    }
   }
   // Brace-balanced extraction with string-awareness (so braces inside JSON
   // strings don't confuse the counter).

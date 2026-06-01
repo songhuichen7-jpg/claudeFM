@@ -7,7 +7,7 @@
 - **前端**：React 19 + Vite 8 + Tailwind v4（`@tailwindcss/vite`）。真实应用入口 `index.html` → `src/main.tsx` → `src/App.tsx`。
 - **后端**：Fastify 5（`server/index.ts`），`@fastify/websocket` + `@fastify/static` + `@fastify/cors`。`tsx` 直跑 TS。
 - **DB**：better-sqlite3，`state.db`（WAL）。schema/迁移在 `server/state.ts`。
-- **AI**：Claude CLI（`server/claude.ts`，`claudeAvailable()`，本机 `~/.local/bin/claude`），出 DJ turn / 排程 / 品味分析；不可用时 `server/fallback.ts` 兜底。
+- **AI**：LLM 适配层（`server/llm.ts`，`llmStatus()`）支持 Claude CLI 与 OpenAI-compatible Chat Completions（DeepSeek 默认 `https://api.deepseek.com`）；出 DJ turn / 排程 / 品味分析；不可用时 `server/fallback.ts` 兜底。
 - **音乐**：NeteaseCloudMusicApi（`server/ncm.ts`：search / songUrl / lyric / recommend；`ncm-auth.ts` 扫码登录）。匿名只拿 30s 试听 + 搜索。
 - **TTS**：MiMo（`server/tts.ts`，`.env` MIMO_*），fallback Fish / silent。产物缓存到 `/tts/`。
 - **其它**：weather(open-meteo)、feishu 日历、naim 客厅推送、scheduler(node-cron) —— 均可选，缺失有 fallback。
@@ -29,7 +29,7 @@
 
 ## 4. 真实接口契约（`server/index.ts`，**不许改既有的**）
 
-- `GET /api/health` → `{ok,claude,calendar,naim,weather,fish,mimo,ttsProvider,activeProfile,moodProbe}`
+- `GET /api/health` → `{ok,claude,llm,calendar,naim,weather,fish,mimo,ttsProvider,activeProfile,moodProbe}`（`claude` 为旧字段，前端读取 `llm`）
 - `POST /api/chat {text}` → DJ turn，并 WS 广播 `{type:"dj",turn}`
 - `GET /api/messages` → `{messages:[{id,ts,kind,speaker,text,meta}]}`
 - `GET /api/now` / `GET /api/next` → 当前 / 队列提示 + 最近 plays

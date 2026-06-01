@@ -1,16 +1,13 @@
 import { readFile, readdir } from "node:fs/promises"
-import { dirname, join, resolve } from "node:path"
-import { fileURLToPath } from "node:url"
+import { join } from "node:path"
 import { Messages, Plays, Profiles, activeProfile } from "./state.js"
 import { getWeather } from "./weather.js"
 import { todayCalendar, calendarEnabled } from "./feishu.js"
-
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const ROOT = resolve(__dirname, "..")
+import { appPath, ensureSeededDataDir } from "./paths.js"
 
 export function activeCorpusDir(): string {
   const p = Profiles.get(activeProfile())
-  return join(ROOT, p?.corpus_dir ?? "user")
+  return ensureSeededDataDir(p?.corpus_dir ?? "user")
 }
 
 export type ContextFragments = {
@@ -25,7 +22,7 @@ export type ContextFragments = {
 let personaCache: string | null = null
 async function persona() {
   if (personaCache) return personaCache
-  personaCache = await readFile(join(ROOT, "prompts", "dj-persona.md"), "utf-8")
+  personaCache = await readFile(appPath("prompts", "dj-persona.md"), "utf-8")
   return personaCache
 }
 
