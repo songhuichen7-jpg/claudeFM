@@ -24,6 +24,7 @@ export function SettingsView({ open, onClose }: Props) {
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [savedAt, setSavedAt] = useState<Record<string, number>>({})
   const [savingName, setSavingName] = useState<string | null>(null)
+  const [saveErr, setSaveErr] = useState<Record<string, string>>({})
   const [openFile, setOpenFile] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [plan, setPlan] = useState<unknown>(null)
@@ -86,12 +87,14 @@ export function SettingsView({ open, onClose }: Props) {
 
   const handleSave = async (name: string) => {
     setSavingName(name)
+    setSaveErr(s => { const n = { ...s }; delete n[name]; return n })
     try {
       await saveTasteFile(name, drafts[name] ?? "")
       setTaste(prev => (prev ? prev.map(f => (f.name === name ? { ...f, body: drafts[name] ?? "" } : f)) : prev))
       setSavedAt(s => ({ ...s, [name]: Date.now() }))
     } catch (err) {
-      alert(`保存失败：${(err as Error).message}`)
+      // Inline rose error (matches npErr / NCM error), not a jarring native alert().
+      setSaveErr(s => ({ ...s, [name]: (err as Error).message }))
     } finally {
       setSavingName(null)
     }
@@ -138,7 +141,7 @@ export function SettingsView({ open, onClose }: Props) {
               <div className="grid grid-cols-2 gap-2">
                 <input
                   value={npId}
-                  onChange={e => setNpId(e.target.value.toLowerCase())}
+                  onChange={e => setNpId(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""))}
                   placeholder="id (a-z0-9_-)"
                   className="rounded-md border border-white/10 bg-black/30 px-2 py-1.5 font-mono text-[12px] text-white outline-none placeholder:text-white/30 light:border-black/10 light:bg-white/50 light:text-black/80"
                 />
@@ -256,6 +259,9 @@ export function SettingsView({ open, onClose }: Props) {
                           spellCheck={false}
                           className="thin-scroll h-48 w-full resize-y rounded-md border border-white/10 bg-black/40 p-2 font-mono text-[11px] leading-relaxed text-white/85 outline-none light:border-black/10 light:bg-white/50 light:text-black/80"
                         />
+                        {saveErr[f.name] && (
+                          <p className="mt-2 font-mono text-[11px] text-rose-400">保存失败：{saveErr[f.name]}</p>
+                        )}
                         <div className="mt-2 flex justify-end">
                           <button
                             type="button"
