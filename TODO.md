@@ -40,5 +40,7 @@
 - [x] D3. TTS 异步化：`dj` 消息先发 `ttsPending:true`、再用新 WS `dj-tts` 补链接（既有 `dj` payload 只多可选字段，前端已配套）。
 - [x] D4. 音频 ducking：TTS 播放时音乐降到 0.32 倍（`rampMusicVolume`，独立机制，不改 TTS ticker）。
 - [x] D5. Electron 桌面端：`electron/main.cjs` + `server/paths.ts` 路径抽象 + `pack:mac`/`dist:mac` 脚本 + 桌面 E2E（`playwright.desktop.config.ts` / `tests/e2e/desktop.spec.ts`）。
-- [ ] D6. ⚠️ **红线③擦边待验**：`<audio>` 从纯内存 `new Audio()` 改为 `appendChild` 到 body。需 **Electron 真机**验证 `createMediaElementSource` 不报 `InvalidStateError`、首播有声、波形动（StrictMode effect 双调用 + 一元素一 source 硬约束的回归面）。
+- [x] D6. ✅ **红线③擦边已验（web/StrictMode 实测）**：`<audio>` 挂 DOM 安全。DOM 正好 3 个元素（无重复泄漏）、`createMediaElementSource` 零 `InvalidStateError`、真实 NCM url 出声 currentTime 推进、FocusView 两波形 canvas 逐帧动（analyser 实时产数据）。最坏情况不成立。
 - [ ] D7. 文档债：PRD/ARCHITECTURE 尚未把「桌面端 + DeepSeek 后端」纳入正式 scope（ARCHITECTURE 仅补了 llm 一行）。大需求按铁律 §3 应回填 PRD。
+- [x] D8. ✅ **桌面端阻断已修复**（验证中发现）：`pnpm desktop` / `e2e:desktop` 启动即崩——内嵌 server `ERR_DLOPEN_FAILED`，better-sqlite3 ABI 不匹配（node 147 vs electron 143）。根因：`prepare:desktop`(`electron-builder install-app-deps`) 默认 `buildFromSource=false`，下的是 node-ABI 预编译产物。**修复**：`package.json` `build` 段加 `"buildDependenciesFromSource": true` → install-app-deps 从源码针对 electron 头编译。验证：`pnpm e2e:desktop` 跑绿（6.8s，server boot + UI + 主题切换 + LLM 可见）。手动启动也确认 server 起、UI 加载、TTS wav 流（206）。
+- [ ] D9. 🟡 follow-up（不阻断）：`tests/e2e/desktop.spec.ts` 的 `waitForHttp` 默认 30s，对 from-source **冷编译后首启**偏紧（第二次跑因此 flaky，warm 重跑即绿）。建议提到 ~60s。另：web↔desktop 切换需各自 rebuild better-sqlite3（`prepare:web-native` 已接进 `e2e`；`pnpm dev` 之后跑过 desktop 要手动 `pnpm rebuild better-sqlite3` 切回 node-ABI）。

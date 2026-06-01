@@ -29,6 +29,7 @@
   "build": {
     "appId": "fm.claudio.desktop",
     "productName": "Claudio FM",
+    "buildDependenciesFromSource": true,
     "asar": true,
     "asarUnpack": [
       "node_modules/better-sqlite3/**/*"
