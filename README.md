@@ -1,3 +1,20 @@
+# Claudio FM
+
+## LLM backend
+
+By default the server uses Claude CLI if no external LLM key is configured.
+To use DeepSeek or any OpenAI-compatible Chat Completions provider, copy the
+shape from `.env.example` into `.env` and set:
+
+```bash
+LLM_PROVIDER=deepseek
+DEEPSEEK_API_KEY=...
+DEEPSEEK_MODEL=deepseek-v4-flash
+```
+
+For non-DeepSeek providers, use `OPENAI_COMPAT_API_KEY`,
+`OPENAI_COMPAT_BASE_URL`, and `OPENAI_COMPAT_MODEL`.
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
