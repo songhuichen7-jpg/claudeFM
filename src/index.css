@@ -126,6 +126,15 @@ html.light .thin-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12);
 	  touch-action: manipulation;
 	}
 
+	/* Keyboard-only focus ring in the single accent for clickable controls.
+	   Form fields are excluded — they style their own focus (e.g. the composer
+	   input's custom box-shadow ring) and would otherwise double-ring.
+	   Only shows on keyboard nav (:focus-visible), never on mouse press. */
+	:where(button, [role="button"], a[href], [tabindex]:not([tabindex="-1"])):focus-visible {
+	  outline: 2px solid var(--accent);
+	  outline-offset: 2px;
+	}
+
 	.pressable,
 	.pressable-soft {
 	  transform: translateZ(0);

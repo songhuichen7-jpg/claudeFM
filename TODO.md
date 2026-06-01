@@ -50,4 +50,5 @@
 
 - [x] E1. 🔴 **输入法回车 bug**：Composer 的 Enter 处理无 IME 守卫——中文打拼音时按回车选字会**误发半成品消息**。修：`if (e.key === "Enter" && !e.nativeEvent.isComposing)`。src `InputBar.tsx` + 原型 `Composer.tsx` 同步改，placeholder `...`→`…`。tsc 通过。
 - [ ] E2. 观察（待你定，原型即如此非 bug）：transport ♥ 点赞用 `text-pink-400` 粉色，与「单绿」设计冲突（Header/TrackCard 的 ♥ 都是绿）；`FAV`、`Mic` 是死按钮（无 onClick）。要不要统一成绿 / 给死按钮去交互感或接功能。
-- [x] E3. 🟠 **状态诚实**：PlayerContext 有真实 `connected`(WS open/close)，但两处常驻指示**写死**——ChatStream 顶部恒显 "CONNECTED TO CLAUDIO SERVER"、Clock 恒显绿 "ON AIR"，server 断了也撒谎。接上：连上=原样；断开→ChatStream 脉冲 dim "CONNECTING TO CLAUDIO SERVER…"、Clock dim "OFF AIR"（保持单绿不引入新色）。happy path 文案样式不变无回归。
+- [x] E3. 🟠 **状态诚实**：PlayerContext 有真实 `connected`(WS open/close)，但两处常驻指示**写死**——ChatStream 顶部恒显 "CONNECTED TO CLAUDIO SERVER"、Clock 恒显绿 "ON AIR"，server 断了也撒谎。接上：连上=原样；断开→ChatStream 脉冲 dim "CONNECTING TO CLAUDIO SERVER…"、Clock dim "OFF AIR"（保持单绿不引入新色）。happy path 文案样式不变无回归。Playwright 双态实测：连上 ON AIR/CONNECTED、断开 OFF AIR/CONNECTING…。
+- [x] E4. ♿ **键盘焦点环**：全局缺 `:focus-visible`，键盘用户 Tab 无一致焦点态。加 on-brand 绿环（零特异性 `:where`，排除表单控件以免与 composer 自带环双环）。Playwright 实测：按钮得绿环、输入框保留自带环不双环。仅键盘触发不影响鼠标。light/mobile(390) 截图确认无破版、无横向溢出。
