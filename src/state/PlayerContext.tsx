@@ -1017,8 +1017,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const selectTrack = useCallback((t: Track) => {
     currentTrackRef.current = t
     setCurrentTrack(t)
+    // Saved Library tracks (from /api/liked) carry no url — NCM urls are volatile
+    // and never persisted. Without this, clicking a saved track silently did
+    // nothing (playTrack early-returns on missing url). Resolve fresh, then play.
     if (t.url) playTrack(t)
-  }, [playTrack])
+    else resolveAndPlayTrack(t)
+  }, [playTrack, resolveAndPlayTrack])
 
   const replayDJ = useCallback((id: string) => {
     const dj = messages.find(m => m.id === id && m.kind === "dj") as DJMessage | undefined
